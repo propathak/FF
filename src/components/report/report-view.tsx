@@ -94,7 +94,7 @@ export function ReportView({ auditId, bookingUrl }: { auditId: string; bookingUr
         <IssueSections checks={result.checks} />
         <BookingCta bookingUrl={bookingUrl} />
         <NotMeasuredSection result={result} />
-        <ReportActions result={result} />
+        <ReportActions result={result} auditId={auditId} />
       </div>
 
       {data.storage === 'memory' && (
@@ -107,7 +107,7 @@ export function ReportView({ auditId, bookingUrl }: { auditId: string; bookingUr
   );
 }
 
-function ReportActions({ result }: { result: AuditResult }) {
+function ReportActions({ result, auditId }: { result: AuditResult; auditId: string }) {
   const [copied, setCopied] = useState(false);
 
   async function share() {
@@ -138,7 +138,12 @@ function ReportActions({ result }: { result: AuditResult }) {
           Your brand scores {result.overall.score}/100 for AI search visibility.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => window.print()}>Download PDF</Button>
+          {/* A plain link, not a fetch-and-blob: the browser's own download
+              handles the progress indicator, the filename from
+              content-disposition, and a failure mid-transfer. */}
+          <a href={`/api/audits/${auditId}/report.pdf`} download>
+            <Button variant="secondary">Download PDF</Button>
+          </a>
           <a href={`mailto:?subject=${subject}&body=${body}`}>
             <Button variant="secondary">Email this report</Button>
           </a>

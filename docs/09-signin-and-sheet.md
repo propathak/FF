@@ -115,6 +115,7 @@ Match the symptom, not the guess. Each of these has one cause.
 | **Error 400: redirect_uri_mismatch** | The address you are on is not registered on the Google client. Usually a `.vercel.app` address when only `indexjoy.com` was added. | Add that exact address to both lists in Part 1, step 3. Google applies the change within a few minutes. |
 | **Access blocked: … has not completed the Google verification process** | The consent screen is still in **Testing**. | Publish the app (Part 1, step 2), or add the account under **Test users**. |
 | **Bounced back to `/signin` with "not finished being set up"** | The credentials are genuinely absent — the sign-in page checked before redirecting. | The page lists the missing variable names. Set them and redeploy. |
+| **`UntrustedHost: Host must be trusted`** in the logs | Auth.js only trusts the incoming host when it can tell it is behind a known proxy. On Vercel the `VERCEL` variable does that automatically, so this only appears when self-hosting or running `next start` locally. | Set `AUTH_TRUST_HOST=true`. |
 | **Sign-in completes but nothing reaches the sheet** | The Sheets side (Part 2) is separate and deliberately silent on failure. | Confirm the Sheets API is enabled and the sheet is shared with the service account. Sign-in and audits are unaffected. |
 
 Saving a variable in Vercel does not change the running site. After any change to
