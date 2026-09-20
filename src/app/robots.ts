@@ -1,6 +1,8 @@
 import type { MetadataRoute } from 'next';
 
-const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? 'https://indexjoy.com';
+import { appUrl } from '@/lib/app-url';
+
+const APP_URL = appUrl();
 
 /**
  * Our own robots.txt. Individual reports are unguessable but public, so they

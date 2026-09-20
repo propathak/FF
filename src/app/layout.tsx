@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
 import { auth, signOut } from '@/auth';
+import { appUrl } from '@/lib/app-url';
 import './globals.css';
 
 // The agency's own name, not the product's — this is the discreet white-label
 // slot in the report footer. Set NEXT_PUBLIC_AGENCY_NAME before launch.
 const AGENCY = process.env['NEXT_PUBLIC_AGENCY_NAME'] ?? 'Your Agency';
-const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? 'http://localhost:3000';
+const APP_URL = appUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),

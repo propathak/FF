@@ -4,6 +4,7 @@ import { normaliseInputUrl } from '@/engine/util/url';
 import { getRepository, type AuditRow } from './repository';
 import { recordAudit } from './sheets';
 import { scoreLead, signalsFromAudit } from './lead-score';
+import { appUrl } from './app-url';
 
 /**
  * Job orchestration.
@@ -101,7 +102,7 @@ export async function executeAudit(auditId: string, input: StartAuditInput): Pro
     // audit: Postgres is the source of truth and the sheet is a reporting
     // surface that can be rebuilt from it.
     if (input.email) {
-      const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? '';
+      const base = appUrl();
       // The grade comes free from data we already hold — no form required.
       const grade = scoreLead(signalsFromAudit(result, input.email, false)).grade;
       void recordAudit({
@@ -117,7 +118,7 @@ export async function executeAudit(auditId: string, input: StartAuditInput): Pro
         pagesCrawled: result.stats.pagesCrawled,
         criticalCount: result.stats.criticalCount,
         leadGrade: grade,
-        reportUrl: appUrl ? `${appUrl}/audit/${auditId}` : auditId,
+        reportUrl: `${base}/audit/${auditId}`,
       }).catch(() => undefined);
     }
   } catch (err) {
