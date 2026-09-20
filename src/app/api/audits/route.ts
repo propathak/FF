@@ -1,4 +1,5 @@
 import { NextResponse, after } from 'next/server';
+import { auth } from '@/auth';
 import { z } from 'zod';
 import { normaliseInputUrl } from '@/engine/util/url';
 import { getRepository, isEphemeralInProduction } from '@/lib/repository';
@@ -11,12 +12,22 @@ export const maxDuration = 300;
 
 const RequestSchema = z.object({
   url: z.string().min(3).max(2048),
-  email: z.string().email().max(320).optional().or(z.literal('')),
   market: z.enum(['global', 'us', 'in', 'uk', 'ae', 'au', 'ca', 'sg']).default('global'),
   competitorUrls: z.array(z.string().max(2048)).max(3).default([]),
 });
 
 export async function POST(request: Request) {
+  // Identity comes from the session, never from the request body — a
+  // self-reported email would make the audit log worthless.
+  const session = await auth();
+  const email = session?.user?.email;
+  if (!email) {
+    return NextResponse.json(
+      { error: 'Please sign in to run an audit.', code: 'unauthenticated' },
+      { status: 401 },
+    );
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -27,7 +38,7 @@ export async function POST(request: Request) {
   const parsed = RequestSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json(
-      { error: 'Please provide a valid website address and email.', details: parsed.error.issues.map((i) => i.message) },
+      { error: 'Please provide a valid website address.', details: parsed.error.issues.map((i) => i.message) },
       { status: 400 },
     );
   }
@@ -63,13 +74,22 @@ export async function POST(request: Request) {
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const ipKey = await hashIp(ip);
 
-  const [domainOk, ipOk] = await Promise.all([
+  const [domainOk, ipOk, userOk] = await Promise.all([
     repo.consumeRateLimit('audit:domain', host, perDomain, 24 * 60 * 60 * 1000),
     repo.consumeRateLimit('audit:ip', ipKey, 10, 60 * 60 * 1000),
+    // Signed-in identity is the most reliable key we have, so it carries the
+    // real quota; the IP and domain limits are now just backstops.
+    repo.consumeRateLimit('audit:user', email.toLowerCase(), 20, 24 * 60 * 60 * 1000),
   ]);
   if (!domainOk) {
     return NextResponse.json(
       { error: `${host} has already been audited ${perDomain} times today. Please try again tomorrow.` },
+      { status: 429 },
+    );
+  }
+  if (!userOk) {
+    return NextResponse.json(
+      { error: 'You have reached the daily audit limit for this account. It resets in 24 hours.' },
       { status: 429 },
     );
   }
@@ -80,7 +100,7 @@ export async function POST(request: Request) {
   const auditId = newAuditId();
   const input = {
     url: normalised,
-    email: parsed.data.email || undefined,
+    email,
     market: parsed.data.market,
     competitorUrls: parsed.data.competitorUrls.filter(Boolean),
     // Free tier by default; paid enrichment is unlocked by the lead form.

@@ -15,10 +15,15 @@ const MARKETS = [
   { value: 'sg', label: 'Singapore' },
 ];
 
-export function AuditForm() {
+export function AuditForm({
+  signedIn,
+  initialUrl = '',
+}: {
+  signedIn: boolean;
+  initialUrl?: string;
+}) {
   const router = useRouter();
-  const [url, setUrl] = useState('');
-  const [email, setEmail] = useState('');
+  const [url, setUrl] = useState(initialUrl);
   const [market, setMarket] = useState('global');
   const [competitors, setCompetitors] = useState(['', '', '']);
   const [expanded, setExpanded] = useState(false);
@@ -32,6 +37,14 @@ export function AuditForm() {
       setError('Enter the website you want to check.');
       return;
     }
+
+    // Carry the typed URL through sign-in so nothing has to be retyped.
+    if (!signedIn) {
+      const back = `/?url=${encodeURIComponent(url.trim())}`;
+      router.push(`/signin?callbackUrl=${encodeURIComponent(back)}`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const response = await fetch('/api/audits', {
@@ -39,12 +52,16 @@ export function AuditForm() {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           url: url.trim(),
-          email: email.trim(),
           market,
           competitorUrls: competitors.map((c) => c.trim()).filter(Boolean),
         }),
       });
-      const data = (await response.json()) as { id?: string; error?: string };
+      const data = (await response.json()) as { id?: string; error?: string; code?: string };
+      if (response.status === 401 || data.code === 'unauthenticated') {
+        // The session expired between page load and submit.
+        router.push(`/signin?callbackUrl=${encodeURIComponent(`/?url=${url.trim()}`)}`);
+        return;
+      }
       if (!response.ok || !data.id) {
         setError(data.error ?? 'We could not start that audit. Please try again.');
         setSubmitting(false);
@@ -63,32 +80,20 @@ export function AuditForm() {
         className="rounded-2xl border p-5 sm:p-6"
         style={{ background: 'var(--surface-1)', boxShadow: 'var(--shadow-lg)' }}
       >
-        <div className="grid gap-4 sm:grid-cols-[1.4fr_1fr]">
-          <Field label="Your website" required>
-            <input
-              className={inputClass}
-              style={inputStyle}
-              type="text"
-              inputMode="url"
-              autoComplete="url"
-              placeholder="yourcompany.com"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              aria-invalid={Boolean(error)}
-            />
-          </Field>
-          <Field label="Work email" hint="for your report">
-            <input
-              className={inputClass}
-              style={inputStyle}
-              type="email"
-              autoComplete="email"
-              placeholder="you@yourcompany.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </Field>
-        </div>
+        <Field label="Your website" required>
+          <input
+            className={inputClass}
+            style={inputStyle}
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="yourcompany.com"
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            aria-invalid={Boolean(error)}
+            autoFocus={Boolean(initialUrl)}
+          />
+        </Field>
 
         <button
           type="button"
@@ -154,13 +159,17 @@ export function AuditForm() {
             <>
               <Spinner /> Starting your audit…
             </>
-          ) : (
+          ) : signedIn ? (
             'Check my visibility'
+          ) : (
+            'Continue with Google'
           )}
         </Button>
 
         <p className="mt-3 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-          No signup. No card. Results in under a minute.
+          {signedIn
+            ? 'No card. Results in under a minute.'
+            : 'Sign in with Google to run your audit. No card, results in under a minute.'}
         </p>
       </div>
     </form>

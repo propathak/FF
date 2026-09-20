@@ -49,10 +49,6 @@ export function buildRecommendations(
       action: template.action,
       impact: template.impact,
       effort: template.effort,
-      // Nothing urgent is ever gated. A prospect must always be able to act on
-      // what is actively hurting them — that is what earns the trust the gate
-      // then converts. Gating applies to strategy, never to an emergency.
-      gated: horizon === 'now' ? false : template.gated,
     });
   }
 

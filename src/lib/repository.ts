@@ -69,6 +69,8 @@ export interface Repository {
   updateAudit(id: string, patch: Partial<AuditRow>): Promise<void>;
   getAudit(id: string): Promise<AuditRow | null>;
   listAuditsForHost(host: string, limit?: number): Promise<AuditRow[]>;
+  /** Most recent audits across all users — the admin view. */
+  listRecentAudits(limit?: number): Promise<AuditRow[]>;
   recordStage(auditId: string, event: StageEvent): Promise<void>;
   getStages(auditId: string): Promise<StageEvent[]>;
   createLead(row: Omit<LeadRow, 'id' | 'created_at'>): Promise<LeadRow>;
@@ -138,6 +140,11 @@ function memoryRepository(): Repository {
     async listAuditsForHost(host, limit = 20) {
       return [...memoryStore().audits.values()]
         .filter((a) => a.host === host && a.status === 'complete')
+        .sort((a, b) => b.created_at.localeCompare(a.created_at))
+        .slice(0, limit);
+    },
+    async listRecentAudits(limit = 200) {
+      return [...memoryStore().audits.values()]
         .sort((a, b) => b.created_at.localeCompare(a.created_at))
         .slice(0, limit);
     },
@@ -233,6 +240,11 @@ function supabaseRepository(url: string, serviceKey: string): Repository {
         (await request<AuditRow[]>(
           `/audits?host=eq.${encodeURIComponent(host)}&status=eq.complete&select=*&order=created_at.desc&limit=${limit}`,
         )) ?? []
+      );
+    },
+    async listRecentAudits(limit = 200) {
+      return (
+        (await request<AuditRow[]>(`/audits?select=*&order=created_at.desc&limit=${limit}`)) ?? []
       );
     },
     async recordStage(auditId, event) {
@@ -397,6 +409,10 @@ function postgresRepository(connectionString: string): Repository {
          order by created_at desc limit $2`,
         [host, limit],
       );
+    },
+
+    async listRecentAudits(limit = 200) {
+      return q<AuditRow>('select * from audits order by created_at desc limit $1', [limit]);
     },
 
     async recordStage(auditId, event) {

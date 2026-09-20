@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { auth, signOut } from '@/auth';
 import './globals.css';
 
 // The agency's own name, not the product's — this is the discreet white-label
@@ -33,7 +34,8 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  const session = await auth();
   return (
     <html lang="en">
       <body>
@@ -45,7 +47,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         <div className="flex min-h-screen flex-col">
-          <SiteHeader />
+          <SiteHeader email={session?.user?.email ?? null} />
           <main id="main" className="flex-1">{children}</main>
           <SiteFooter agency={AGENCY} />
         </div>
@@ -54,32 +56,58 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   );
 }
 
-function SiteHeader() {
+function SiteHeader({ email }: { email: string | null }) {
   return (
     <header
       className="no-print sticky top-0 z-40 border-b backdrop-blur-md"
       style={{ background: 'color-mix(in srgb, var(--surface-0) 82%, transparent)' }}
     >
-      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4">
         <a href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <LogoMark />
           <span>Index Joy</span>
         </a>
-        <nav className="flex items-center gap-1 text-sm">
+        <nav className="flex min-w-0 items-center gap-1 text-sm">
           <a
             href="/methodology"
-            className="rounded-md px-3 py-1.5 transition-colors hover:bg-[var(--surface-2)]"
+            className="hidden rounded-md px-3 py-1.5 transition-colors hover:bg-[var(--surface-2)] sm:block"
             style={{ color: 'var(--text-secondary)' }}
           >
             Methodology
           </a>
-          <a
-            href="/#audit"
-            className="rounded-md px-3 py-1.5 font-medium transition-colors"
-            style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)' }}
-          >
-            Check my visibility
-          </a>
+          {email ? (
+            <>
+              <span
+                className="hidden max-w-[180px] truncate px-2 text-xs md:block"
+                style={{ color: 'var(--text-muted)' }}
+                title={email}
+              >
+                {email}
+              </span>
+              <form
+                action={async () => {
+                  'use server';
+                  await signOut({ redirectTo: '/' });
+                }}
+              >
+                <button
+                  type="submit"
+                  className="rounded-md px-3 py-1.5 transition-colors hover:bg-[var(--surface-2)]"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Sign out
+                </button>
+              </form>
+            </>
+          ) : (
+            <a
+              href="/signin"
+              className="rounded-md px-3 py-1.5 font-medium transition-colors"
+              style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)' }}
+            >
+              Sign in
+            </a>
+          )}
         </nav>
       </div>
     </header>

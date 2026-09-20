@@ -192,7 +192,9 @@ aspirational.
 
 ## 7. Lead scoring (agency-side)
 
-Computed at audit completion, stored on the lead row, and used to sort the admin table.
+Computed at audit completion from data we already hold — there is no form. The signed-in email
+supplies the identity term, the crawl supplies the rest. Shown in the admin table and in the
+Google Sheet.
 
 ```
 opportunitySize = log10(max(pagesDiscovered, 10)) / 3          // 10→0.33, 1k→1.0  (capped)
@@ -201,8 +203,8 @@ brandEquity     = normalise(openPageRank, 0..10) × 0.6
                 + (hasWikidataEntity ? 0.25 : 0)
                 + (tier1to3CitationCount > 0 ? 0.15 : 0)
 intentSignal    = (competitorsProvided ? 0.25 : 0)
-                + (workEmailDomain === auditedDomain ? 0.45 : 0)   // strongest single signal
-                + (budgetProvided ? 0.30 : 0)
+                + (signInDomain === auditedDomain ? 0.45 : 0)      // strongest single signal
+                + (budgetProvided ? 0.30 : 0)                      // unused since sign-in replaced the form
 
 leadScore = 100 × (0.30·opportunitySize + 0.30·painLevel
                  + 0.25·brandEquity + 0.15·intentSignal)
@@ -215,7 +217,8 @@ leadScore = 100 × (0.30·opportunitySize + 0.30·painLevel
 | C | 40–54 | Worth a nurture sequence |
 | D | <40 | Small site or competitor/agency recon |
 
-`workEmailDomain === auditedDomain` is weighted highest because it separates an actual stakeholder
-from an agency doing competitive research on someone else's site — the difference between a lead
+`signInDomain === auditedDomain` is weighted highest because it separates an actual stakeholder
+from an agency doing competitive research on someone else's site — and because it now comes from
+a Google-verified address rather than a typed one — the difference between a lead
 and a lurker. Free-mail domains (gmail/outlook/yahoo/…) score 0 on that term and are flagged in
 the admin table.

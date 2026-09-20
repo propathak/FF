@@ -56,19 +56,17 @@ describe('recommendation catalog quality', () => {
     }
   });
 
-  it('gates strategy work but never anything urgent', () => {
-    const gatedCount = Object.values(RECOMMENDATION_CATALOG).filter((t) => t.gated).length;
-    expect(gatedCount).toBeGreaterThan(5);
-
-    // Including a catalogued 30-day item that gets promoted to "now" because
-    // the check outright failed — promotion must strip the gate with it.
+  it('gives every recommendation a full, readable action', () => {
+    // Nothing is withheld any more: identity is captured at sign-in, so the
+    // report is shown in full. Every action must therefore stand on its own.
     const recs = buildRecommendations(
       Object.keys(RECOMMENDATION_CATALOG).map((id) => check(id, { pillar: 'geo', group: 'geo.entity' })),
       pillars,
     );
     expect(recs.length).toBeGreaterThan(0);
-    for (const rec of recs.filter((r) => r.horizon === 'now')) {
-      expect(rec.gated, `${rec.checkId} is urgent and must not be gated`).toBe(false);
+    for (const rec of recs) {
+      expect(rec.action.length, `${rec.checkId} has no usable action`).toBeGreaterThan(40);
+      expect(rec.whyItMatters.length).toBeGreaterThan(40);
     }
   });
 });

@@ -221,9 +221,14 @@ is V1 and not V2 despite the extra crawl cost.
 
 ## 8. Lead-generation strategy
 
-**The gate placement principle:** gate *implementation*, never *diagnosis*. A prospect who
-cannot see their problem cannot feel it. A prospect who can see the problem but not the fix
-has exactly one move.
+**Superseded — the product now captures identity at sign-in instead of gating the report.**
+A person signs in with Google before running an audit, then sees the complete report. The
+earlier design blurred the roadmap behind a second form; asking the same person for the same
+thing twice was friction that bought almost nothing, and a report that can be verified in full
+converts better than one that withholds half of itself. Every sign-in and every audit is
+appended to a Google Sheet. See `docs/09-signin-and-sheet.md`.
+
+The historical free/gated split is kept below for the record.
 
 | Free (no email) | Free (after email) | Sales call only |
 |---|---|---|

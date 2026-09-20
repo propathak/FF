@@ -1,10 +1,16 @@
+import { auth } from '@/auth';
 import { AuditForm } from '@/components/audit-form';
 import { Card } from '@/components/ui/primitives';
 
-export default function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ url?: string }>;
+}) {
+  const [{ url }, session] = await Promise.all([searchParams, auth()]);
   return (
     <>
-      <Hero />
+      <Hero signedIn={Boolean(session?.user?.email)} initialUrl={url ?? ''} />
       <SignalStrip />
       <WhatWeCheck />
       <Faq />
@@ -12,7 +18,7 @@ export default function HomePage() {
   );
 }
 
-function Hero() {
+function Hero({ signedIn, initialUrl }: { signedIn: boolean; initialUrl: string }) {
   return (
     <section className="relative overflow-hidden" id="audit">
       <div
@@ -40,7 +46,7 @@ function Hero() {
           number.
         </p>
         <div className="mt-8">
-          <AuditForm />
+          <AuditForm signedIn={signedIn} initialUrl={initialUrl} />
         </div>
       </div>
     </section>

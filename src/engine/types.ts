@@ -353,8 +353,6 @@ export interface Recommendation {
   action: string;
   impact: ImpactLevel;
   effort: EffortLevel;
-  /** Gated recommendations are blurred until the lead form is submitted. */
-  gated: boolean;
 }
 
 export interface BusinessTranslation {

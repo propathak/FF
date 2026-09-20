@@ -197,9 +197,7 @@ const STATUS_GROUPS = [
   { status: 'pass' as const, title: "What you're doing well", tone: 'good' as StatusTone, note: 'Healthy signals worth defending.' },
 ];
 
-export function IssueSections({
-  checks, freeLimit,
-}: { checks: CheckResult[]; freeLimit: number | null }) {
+export function IssueSections({ checks }: { checks: CheckResult[] }) {
   return (
     <section>
       <SectionHeading
@@ -210,8 +208,6 @@ export function IssueSections({
         {STATUS_GROUPS.map((group) => {
           const items = checks.filter((c) => c.status === group.status);
           if (items.length === 0) return null;
-          const visible = freeLimit === null ? items : items.slice(0, freeLimit);
-          const hidden = items.length - visible.length;
           return (
             <Card key={group.status} padded={false}>
               <div className="flex items-start justify-between gap-4 border-b p-5">
@@ -227,13 +223,8 @@ export function IssueSections({
                 <Badge tone={group.tone}>{items.length}</Badge>
               </div>
               <ul className="divide-y">
-                {visible.map((check) => <CheckRow key={check.id} check={check} />)}
+                {items.map((check) => <CheckRow key={check.id} check={check} />)}
               </ul>
-              {hidden > 0 && (
-                <p className="border-t p-4 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
-                  {hidden} more in the full report.
-                </p>
-              )}
             </Card>
           );
         })}
@@ -348,15 +339,10 @@ function CheckRow({ check }: { check: CheckResult }) {
 
 // ---------------------------------------------------------------------------
 
-export function QuestionGapSection({
-  result, unlocked,
-}: { result: AuditResult; unlocked: boolean }) {
+export function QuestionGapSection({ result }: { result: AuditResult }) {
   const unanswered = result.questionGaps.filter((g) => !g.answered);
   const answered = result.questionGaps.filter((g) => g.answered);
   if (result.questionGaps.length === 0) return null;
-
-  const shown = unlocked ? unanswered : unanswered.slice(0, 4);
-  const hidden = unanswered.length - shown.length;
 
   return (
     <section>
@@ -371,22 +357,13 @@ export function QuestionGapSection({
       />
       <Card padded={false}>
         <ul className="divide-y">
-          {shown.map((gap) => (
+          {unanswered.map((gap) => (
             <li key={gap.question} className="flex items-center justify-between gap-4 p-4">
               <span className="text-sm">{gap.question}</span>
               <Badge tone="neutral">{gap.intent.replace('_', ' ')}</Badge>
             </li>
           ))}
         </ul>
-        {hidden > 0 && (
-          <div className="border-t p-4 text-center">
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-medium" style={{ color: 'var(--text-primary)' }}>{hidden} more</span>{' '}
-              unanswered questions, including the comparison and &ldquo;best for&rdquo; questions
-              where buying decisions get made.
-            </p>
-          </div>
-        )}
       </Card>
       {answered.length > 0 && (
         <details className="mt-3 text-sm">
@@ -483,8 +460,8 @@ const HORIZONS = [
 ];
 
 export function RecommendationSection({
-  recommendations, unlocked,
-}: { recommendations: Recommendation[]; unlocked: boolean }) {
+  recommendations,
+}: { recommendations: Recommendation[] }) {
   return (
     <section>
       <SectionHeading
@@ -503,7 +480,7 @@ export function RecommendationSection({
               </div>
               <div className="grid gap-3">
                 {items.map((rec) => (
-                  <RecommendationCard key={rec.id} rec={rec} unlocked={unlocked} />
+                  <RecommendationCard key={rec.id} rec={rec} />
                 ))}
               </div>
             </div>
@@ -514,8 +491,7 @@ export function RecommendationSection({
   );
 }
 
-function RecommendationCard({ rec, unlocked }: { rec: Recommendation; unlocked: boolean }) {
-  const gated = rec.gated && !unlocked;
+function RecommendationCard({ rec }: { rec: Recommendation }) {
   return (
     <Card>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -542,7 +518,7 @@ function RecommendationCard({ rec, unlocked }: { rec: Recommendation; unlocked: 
           <dt className="text-xs font-medium uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
             Recommended action
           </dt>
-          <dd className={cn('mt-0.5 leading-relaxed', gated && 'locked-content')} style={{ color: 'var(--text-secondary)' }}>
+          <dd className="mt-0.5 leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
             {rec.action}
           </dd>
         </div>

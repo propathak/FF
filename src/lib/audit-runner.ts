@@ -2,6 +2,8 @@ import { runAudit } from '@/engine/pipeline';
 import { SCORING_VERSION } from '@/engine/config';
 import { normaliseInputUrl } from '@/engine/util/url';
 import { getRepository, type AuditRow } from './repository';
+import { recordAudit } from './sheets';
+import { scoreLead, signalsFromAudit } from './lead-score';
 
 /**
  * Job orchestration.
@@ -94,6 +96,30 @@ export async function executeAudit(auditId: string, input: StartAuditInput): Pro
       result,
       completed_at: new Date().toISOString(),
     });
+
+    // Log to the sheet after the database write, and never let it fail the
+    // audit: Postgres is the source of truth and the sheet is a reporting
+    // surface that can be rebuilt from it.
+    if (input.email) {
+      const appUrl = process.env['NEXT_PUBLIC_APP_URL'] ?? '';
+      // The grade comes free from data we already hold — no form required.
+      const grade = scoreLead(signalsFromAudit(result, input.email, false)).grade;
+      void recordAudit({
+        email: input.email,
+        website: result.target.host,
+        market: result.target.market,
+        overall: result.overall.score,
+        seo: pillar('seo'),
+        aeo: pillar('aeo'),
+        geo: pillar('geo'),
+        googleVisibility: result.overall.googleVisibility,
+        aiVisibility: result.overall.aiVisibility,
+        pagesCrawled: result.stats.pagesCrawled,
+        criticalCount: result.stats.criticalCount,
+        leadGrade: grade,
+        reportUrl: appUrl ? `${appUrl}/audit/${auditId}` : auditId,
+      }).catch(() => undefined);
+    }
   } catch (err) {
     await repo.updateAudit(auditId, {
       status: 'failed',

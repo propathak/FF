@@ -7,7 +7,7 @@ visibility problem better than their current agency.
 
 | Deliverable | Status |
 |---|---|
-| Landing page, single dominant input, no signup gate | ✅ |
+| Landing page with a single dominant input; the typed URL survives sign-in | ✅ |
 | Stage-checkpointed audit pipeline (8 stages) | ✅ |
 | Polite crawler (robots-aware, ≤25 pages, concurrency-limited) | ✅ |
 | 41 deterministic checks across SEO / AEO / GEO | ✅ |
@@ -18,7 +18,7 @@ visibility problem better than their current agency.
 | Money-left-on-the-table translation layer | ✅ |
 | Competitor comparison (user-supplied, same engine) | ✅ |
 | Recommendation engine (Now / 30d / 90d, Impact+Effort) | ✅ |
-| Gated roadmap + lead capture + lead scoring | ✅ |
+| Google sign-in + Google Sheet logging + automatic lead grading | ✅ (replaced the gated lead form) |
 | Postgres schema + repository layer (in-memory fallback for local dev) | ✅ |
 | Public `/methodology` page | ✅ |
 | Minimal admin lead table with CRM statuses | ✅ |

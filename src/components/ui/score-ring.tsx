@@ -2,6 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import type { StatusTone } from './primitives';
+import { TONE_COLOR, toneForScore } from '@/lib/tone';
+
+export { toneForScore };
 
 /**
  * Score ring.
@@ -11,22 +14,6 @@ import type { StatusTone } from './primitives';
  * hue, because the colour here encodes *state*, not identity — and the band
  * label beside it means the colour never carries the meaning alone.
  */
-
-export function toneForScore(score: number): StatusTone {
-  if (score >= 70) return 'good';
-  if (score >= 55) return 'warning';
-  if (score >= 35) return 'serious';
-  return 'critical';
-}
-
-const TONE_COLOR: Record<StatusTone, string> = {
-  good: 'var(--status-good)',
-  warning: 'var(--status-warning)',
-  serious: 'var(--status-serious)',
-  critical: 'var(--status-critical)',
-  neutral: 'var(--text-muted)',
-  accent: 'var(--accent)',
-};
 
 export function ScoreRing({
   score,

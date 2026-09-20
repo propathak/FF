@@ -35,8 +35,10 @@ cp .env.example .env.local     # every key is optional
 npm run dev                    # → http://localhost:3000
 ```
 
-It runs a complete audit with **zero API keys configured** and honestly labels everything it could
-not measure.
+It runs a complete audit with **zero paid API keys** and honestly labels everything it could not
+measure. Google sign-in is the one thing you do need configured to run an audit through the web
+UI — see [`docs/09-signin-and-sheet.md`](docs/09-signin-and-sheet.md), or use the CLI below,
+which needs no auth at all.
 
 ### Audit a site from the command line
 
@@ -75,7 +77,8 @@ npm run build
 | [`docs/05-database.md`](docs/05-database.md) | Schema design and the reasoning behind each decision |
 | [`docs/06-limitations.md`](docs/06-limitations.md) | What cannot be measured and why — the product's main credibility asset |
 | [`docs/07-roadmap.md`](docs/07-roadmap.md) | Phases 1–4, with the sequencing risk that would make me reorder them |
-| [`docs/08-deployment.md`](docs/08-deployment.md) | Deploying to **indexjoy.com** — Vercel, Supabase and GoDaddy DNS, step by step |
+| [`docs/08-deployment.md`](docs/08-deployment.md) | Deploying to **indexjoy.com** — Vercel, the database and GoDaddy DNS, step by step |
+| [`docs/09-signin-and-sheet.md`](docs/09-signin-and-sheet.md) | Google sign-in and the Google Sheet — the two pieces of Google setup |
 
 ---
 
@@ -122,6 +125,7 @@ See [`docs/08-deployment.md`](docs/08-deployment.md) for the full walkthrough. T
 2. Import the repo at [vercel.com/new](https://vercel.com/new), add the variables from
    [`.env.production.example`](.env.production.example), and enable **Fluid compute**.
 3. Add `indexjoy.com` in Vercel, then create the A and CNAME records it shows you in GoDaddy.
+4. Set up Google sign-in and the Sheet — [`docs/09-signin-and-sheet.md`](docs/09-signin-and-sheet.md).
 
 A database is **required** in production: each serverless invocation is a separate instance, so
 without one the audit that gets written by one request would 404 when polled by another. The API

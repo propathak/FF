@@ -8,7 +8,7 @@ import {
   CompetitorSection, IssueSections, MoneyOnTable, NotMeasuredSection, PillarGrid,
   QuestionGapSection, RecommendationSection, ScoreHeader,
 } from './sections';
-import { BookingCta, LockedRoadmap } from './lead-gate';
+import { BookingCta } from './booking-cta';
 
 interface AuditResponse {
   id: string;
@@ -20,19 +20,18 @@ interface AuditResponse {
   storage: 'memory' | 'supabase';
 }
 
-/** Free tier shows the top N findings per bucket; unlocking reveals the rest. */
-const FREE_FINDING_LIMIT = 5;
-
-export function ReportView({ auditId }: { auditId: string }) {
+export function ReportView({ auditId, bookingUrl }: { auditId: string; bookingUrl: string | null }) {
   const [data, setData] = useState<AuditResponse | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [unlocked, setUnlocked] = useState(false);
-  const [bookingUrl, setBookingUrl] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const poll = useCallback(async () => {
     try {
       const response = await fetch(`/api/audits/${auditId}`, { cache: 'no-store' });
+      if (response.status === 401) {
+        window.location.href = `/signin?callbackUrl=${encodeURIComponent(`/audit/${auditId}`)}`;
+        return;
+      }
       if (!response.ok) {
         setFetchError(response.status === 404 ? 'We could not find that audit.' : 'Could not load the audit.');
         return;
@@ -89,19 +88,11 @@ export function ReportView({ auditId }: { auditId: string }) {
       <div className="mt-12 space-y-14">
         <PillarGrid pillars={result.pillars} mode={result.mode} />
         <MoneyOnTable result={result} />
-        <QuestionGapSection result={result} unlocked={unlocked} />
+        <QuestionGapSection result={result} />
         <CompetitorSection result={result} insights={result.competitorInsights} />
-        <RecommendationSection recommendations={result.recommendations} unlocked={unlocked} />
-        <LockedRoadmap
-          result={result}
-          unlocked={unlocked}
-          onUnlock={(_leadId, url) => {
-            setUnlocked(true);
-            setBookingUrl(url);
-          }}
-        />
-        {unlocked && <BookingCta bookingUrl={bookingUrl} />}
-        <IssueSections checks={result.checks} freeLimit={unlocked ? null : FREE_FINDING_LIMIT} />
+        <RecommendationSection recommendations={result.recommendations} />
+        <IssueSections checks={result.checks} />
+        <BookingCta bookingUrl={bookingUrl} />
         <NotMeasuredSection result={result} />
         <ReportActions result={result} />
       </div>
