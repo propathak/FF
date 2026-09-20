@@ -1,6 +1,6 @@
 # 01 — Product Architecture
 
-> Working product name: **Findable** (placeholder — repo is `FF`).
+> Product name: **Index Joy**. Repository is `FF`.
 > Positioning: *"Find out how visible your brand is across Google and AI — and what is stopping customers from finding you."*
 
 ---

@@ -9,8 +9,11 @@ export const CRAWL_DEFAULTS = {
   concurrency: 5,
   pageTimeoutMs: 10_000,
   maxBodyBytes: 2_000_000,
+  // Wikimedia and several other hosts bucket non-contactable agents into a
+  // restrictive rate-limit tier, so the URL and address below must be REAL and
+  // monitored before this runs in production — replace the .example values.
   userAgent:
-    'FindableBot/1.0 (+https://findable.example/bot; visibility audit; contact@findable.example)',
+    'IndexJoyBot/1.0 (+https://indexjoy.example/bot; visibility audit; contact@indexjoy.example)',
 } as const;
 
 /**

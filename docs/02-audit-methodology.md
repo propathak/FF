@@ -62,7 +62,7 @@ treating it as one would make our report feel like it has an agenda.
 
 - BFS from the homepage, seeded by sitemap URLs when present.
 - Same-registrable-domain only; max 25 pages; concurrency 5; 10s timeout; 2 MB body cap.
-- Honours `robots.txt` for our own agent (`FindableBot`), sends a contactable User-Agent.
+- Honours `robots.txt` for our own agent (`IndexJoyBot`), sends a contactable User-Agent.
 - HTML only (`text/html`); PDFs, images and assets are recorded as links but not fetched.
 - Client-side-rendered detection: if served HTML has `<2%` text-to-HTML ratio, near-empty `<body>`,
   and a known SPA root (`#root`, `#__next` with no children), we raise `tech.csr_dependency`

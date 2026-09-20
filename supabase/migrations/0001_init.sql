@@ -1,5 +1,5 @@
 -- ---------------------------------------------------------------------------
--- Findable — initial schema
+-- Index Joy — initial schema
 -- See docs/05-database.md for the reasoning behind each decision.
 -- ---------------------------------------------------------------------------
 

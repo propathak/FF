@@ -102,7 +102,7 @@ interface MemoryStore {
   rateBuckets: Map<string, { count: number; resetAt: number }>;
 }
 
-const STORE_KEY = Symbol.for('findable.memory-store');
+const STORE_KEY = Symbol.for('indexjoy.memory-store');
 
 function memoryStore(): MemoryStore {
   const globals = globalThis as unknown as Record<symbol, MemoryStore | undefined>;

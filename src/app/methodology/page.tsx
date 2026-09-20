@@ -8,7 +8,7 @@ import { Card, SectionHeading } from '@/components/ui/primitives';
 export const metadata: Metadata = {
   title: 'Methodology',
   description:
-    'Exactly how Findable scores search and AI visibility: every weight, every rule, and every limitation — including why nobody can measure a ChatGPT ranking.',
+    'Exactly how Index Joy scores search and AI visibility: every weight, every rule, and every limitation — including why nobody can measure a ChatGPT ranking.',
 };
 
 /**
@@ -28,7 +28,7 @@ export default function MethodologyPage() {
     <article className="mx-auto max-w-3xl px-4 pb-24 pt-12">
       <h1 className="text-3xl font-semibold tracking-tight">How we score visibility</h1>
       <p className="mt-3 text-base leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
-        Scoring methodology version {SCORING_VERSION}. Every number in a Findable report comes from
+        Scoring methodology version {SCORING_VERSION}. Every number in an Index Joy report comes from
         deterministic checks over signals we observed on your site. An AI writes the explanations;
         it never produces a score.
       </p>

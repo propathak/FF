@@ -105,7 +105,7 @@ export async function executeAudit(auditId: string, input: StartAuditInput): Pro
 
 /** Coarse hash so we can rate-limit by IP without storing one. */
 export async function hashIp(ip: string): Promise<string> {
-  const data = new TextEncoder().encode(`findable:${ip}`);
+  const data = new TextEncoder().encode(`indexjoy:${ip}`);
   const digest = await crypto.subtle.digest('SHA-256', data);
   return Array.from(new Uint8Array(digest)).slice(0, 8)
     .map((b) => b.toString(16).padStart(2, '0')).join('');

@@ -1,4 +1,4 @@
-# Findable
+# Index Joy
 
 **Find out how visible your brand is across Google and AI — and what is stopping customers
 from finding you.**

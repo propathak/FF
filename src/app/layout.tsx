@@ -1,20 +1,20 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
-const AGENCY = process.env['NEXT_PUBLIC_AGENCY_NAME'] ?? 'Findable';
+const AGENCY = process.env['NEXT_PUBLIC_AGENCY_NAME'] ?? 'Index Joy';
 const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? 'http://localhost:3000';
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
-    default: 'Findable — how visible is your brand across Google and AI?',
-    template: '%s · Findable',
+    default: 'Index Joy — how visible is your brand across Google and AI?',
+    template: '%s · Index Joy',
   },
   description:
     'Find out how visible your brand is across Google and AI answer engines — and what is stopping customers from finding you. Free audit across SEO, AEO and GEO.',
   openGraph: {
     type: 'website',
-    siteName: 'Findable',
+    siteName: 'Index Joy',
     title: 'How visible is your brand across Google and AI?',
     description:
       'A free audit of your SEO, answer-engine and generative-engine visibility, with the evidence behind every score.',
@@ -61,7 +61,7 @@ function SiteHeader() {
       <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
         <a href="/" className="flex items-center gap-2 font-semibold tracking-tight">
           <LogoMark />
-          <span>Findable</span>
+          <span>Index Joy</span>
         </a>
         <nav className="flex items-center gap-1 text-sm">
           <a
@@ -100,7 +100,7 @@ function SiteFooter({ agency }: { agency: string }) {
       <div className="mx-auto max-w-6xl px-4 py-10">
         <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-sm">
-            <div className="flex items-center gap-2 font-semibold"><LogoMark /> Findable</div>
+            <div className="flex items-center gap-2 font-semibold"><LogoMark /> Index Joy</div>
             <p className="mt-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
               Visibility measurement across search and AI answer engines. Every score traces to
               evidence you can check yourself.

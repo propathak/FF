@@ -46,7 +46,7 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    const stored = sessionStorage.getItem('findable-admin');
+    const stored = sessionStorage.getItem('indexjoy-admin');
     if (stored) {
       setPassword(stored);
       void load(stored);
@@ -55,7 +55,7 @@ export function AdminDashboard() {
 
   async function signIn(event: React.FormEvent) {
     event.preventDefault();
-    sessionStorage.setItem('findable-admin', password);
+    sessionStorage.setItem('indexjoy-admin', password);
     await load(password);
   }
 
