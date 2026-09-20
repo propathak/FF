@@ -1,3 +1,4 @@
+import { Pool, type QueryResultRow } from 'pg';
 import type { AuditResult, StageEvent } from '@/engine/types';
 import type { LeadScoreResult } from './lead-score';
 
@@ -63,7 +64,7 @@ export interface LeadRow {
 }
 
 export interface Repository {
-  driver: 'memory' | 'supabase';
+  driver: 'memory' | 'supabase' | 'postgres';
   createAudit(row: Omit<AuditRow, 'created_at' | 'completed_at'>): Promise<AuditRow>;
   updateAudit(id: string, patch: Partial<AuditRow>): Promise<void>;
   getAudit(id: string): Promise<AuditRow | null>;
@@ -285,6 +286,15 @@ function supabaseRepository(url: string, serviceKey: string): Repository {
       await request(`/leads?id=eq.${id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
     },
     async consumeRateLimit(scope, key, limit, windowMs) {
+      /**
+       * Read-then-write, so two simultaneous requests can both observe the same
+       * count and both be admitted. PostgREST has no atomic increment without a
+       * stored procedure, and over-admitting by one on a burst is an acceptable
+       * cost for a spend control with a wide margin.
+       *
+       * The DATABASE_URL driver does this atomically in a single statement.
+       * That, plus portability, is why it is the recommended path.
+       */
       const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs).toISOString();
       const rows = await request<{ count: number }[]>(
         `/rate_limits?scope=eq.${scope}&key=eq.${encodeURIComponent(key)}&window_start=eq.${windowStart}&select=count`,
@@ -297,6 +307,168 @@ function supabaseRepository(url: string, serviceKey: string): Repository {
         body: JSON.stringify({ scope, key, window_start: windowStart, count: current + 1 }),
       });
       return true;
+    },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Generic Postgres driver (any provider: Neon, Railway, RDS, self-hosted)
+// ---------------------------------------------------------------------------
+
+/**
+ * Speaks plain SQL, so it works with any Postgres rather than only Supabase.
+ * `supabase/migrations/0001_init.sql` is standard Postgres and applies
+ * unchanged on every one of these providers.
+ *
+ * Serverless connection handling: each Vercel invocation is its own process,
+ * so a pool per instance would multiply into hundreds of connections and
+ * exhaust the server's limit. The pool is therefore pinned to `globalThis`
+ * with `max: 1` and every provider's *pooled* connection string is what
+ * belongs in DATABASE_URL (Neon's `-pooler` host, Supabase's pooler port, or
+ * PgBouncer in front of a self-hosted server).
+ */
+const POOL_KEY = Symbol.for('indexjoy.pg-pool');
+
+function pool(connectionString: string): Pool {
+  const globals = globalThis as unknown as Record<symbol, Pool | undefined>;
+  const existing = globals[POOL_KEY];
+  if (existing) return existing;
+  const created = new Pool({
+    connectionString,
+    max: 1,
+    idleTimeoutMillis: 10_000,
+    connectionTimeoutMillis: 10_000,
+    // Managed providers terminate TLS with their own CA; `sslmode=require` in
+    // the URL plus this is the combination that works across all of them.
+    ssl: /\blocalhost\b|\b127\.0\.0\.1\b/.test(connectionString)
+      ? undefined
+      : { rejectUnauthorized: false },
+  });
+  globals[POOL_KEY] = created;
+  return created;
+}
+
+function postgresRepository(connectionString: string): Repository {
+  const q = async <T extends QueryResultRow>(text: string, values: unknown[] = []): Promise<T[]> => {
+    const result = await pool(connectionString).query<T>(text, values);
+    return result.rows;
+  };
+
+  return {
+    driver: 'postgres',
+    async createAudit(row) {
+      const rows = await q<AuditRow>(
+        `insert into audits (
+           id, input_url, host, market, status, scoring_version, mode,
+           overall_score, seo_score, aeo_score, geo_score, ai_presence_score,
+           google_visibility, ai_visibility, pages_crawled, urls_discovered,
+           paid_enrichment, duration_ms, error, result, requester_email
+         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+         returning *`,
+        [
+          row.id, row.input_url, row.host, row.market, row.status, row.scoring_version, row.mode,
+          row.overall_score, row.seo_score, row.aeo_score, row.geo_score, row.ai_presence_score,
+          row.google_visibility, row.ai_visibility, row.pages_crawled, row.urls_discovered,
+          row.paid_enrichment, row.duration_ms, row.error, row.result, row.requester_email,
+        ],
+      );
+      const created = rows[0];
+      if (!created) throw new Error('Postgres did not return the created audit row');
+      return created;
+    },
+
+    async updateAudit(id, patch) {
+      const entries = Object.entries(patch).filter(([, v]) => v !== undefined);
+      if (entries.length === 0) return;
+      // Column names come from our own AuditRow keys, never from user input.
+      const sets = entries.map(([k], i) => `"${k}" = $${i + 2}`).join(', ');
+      await q(`update audits set ${sets} where id = $1`, [id, ...entries.map(([, v]) => v)]);
+    },
+
+    async getAudit(id) {
+      const rows = await q<AuditRow>('select * from audits where id = $1 limit 1', [id]);
+      return rows[0] ?? null;
+    },
+
+    async listAuditsForHost(host, limit = 20) {
+      return q<AuditRow>(
+        `select * from audits
+         where host = $1 and status = 'complete'
+         order by created_at desc limit $2`,
+        [host, limit],
+      );
+    },
+
+    async recordStage(auditId, event) {
+      await q(
+        `insert into audit_stages (audit_id, stage, status, label, detail, finished_at)
+         values ($1,$2,$3,$4,$5,$6)
+         on conflict (audit_id, stage) do update
+           set status = excluded.status,
+               label = excluded.label,
+               detail = excluded.detail,
+               finished_at = excluded.finished_at`,
+        [
+          auditId, event.stage, event.status, event.label, event.detail ?? null,
+          event.status === 'done' ? event.at : null,
+        ],
+      );
+    },
+
+    async getStages(auditId) {
+      const rows = await q<{ stage: string; status: string; label: string | null; detail: string | null; finished_at: Date | null }>(
+        'select stage, status, label, detail, finished_at from audit_stages where audit_id = $1',
+        [auditId],
+      );
+      return rows.map((r) => ({
+        stage: r.stage as StageEvent['stage'],
+        status: r.status as StageEvent['status'],
+        label: r.label ?? r.stage,
+        detail: r.detail ?? undefined,
+        at: (r.finished_at ?? new Date()).toISOString(),
+      }));
+    },
+
+    async createLead(row) {
+      const rows = await q<LeadRow>(
+        `insert into leads (
+           audit_id, name, company, designation, email, phone, budget_band,
+           is_free_email, email_matches_domain, lead_score, grade, status, source
+         ) values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+         returning *`,
+        [
+          row.audit_id, row.name, row.company, row.designation, row.email, row.phone,
+          row.budget_band, row.is_free_email, row.email_matches_domain, row.lead_score,
+          row.grade, row.status, row.source,
+        ],
+      );
+      const created = rows[0];
+      if (!created) throw new Error('Postgres did not return the created lead row');
+      return { ...created, host: row.host, overall_score: row.overall_score };
+    },
+
+    async listLeads(limit = 200) {
+      // The view joins the audit so the admin table renders in one query.
+      return q<LeadRow>('select * from lead_dashboard order by created_at desc limit $1', [limit]);
+    },
+
+    async updateLeadStatus(id, status) {
+      await q('update leads set status = $2, updated_at = now() where id = $1', [id, status]);
+    },
+
+    async consumeRateLimit(scope, key, limit, windowMs) {
+      const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
+      // Atomic: the insert-or-increment happens in one statement, so two
+      // concurrent requests cannot both read the same count and both pass.
+      const rows = await q<{ count: number }>(
+        `insert into rate_limits (scope, key, window_start, count)
+         values ($1,$2,$3,1)
+         on conflict (scope, key, window_start)
+           do update set count = rate_limits.count + 1
+         returning count`,
+        [scope, key, windowStart],
+      );
+      return (rows[0]?.count ?? limit + 1) <= limit;
     },
   };
 }
@@ -318,9 +490,16 @@ export function isEphemeralInProduction(): boolean {
 
 export function getRepository(): Repository {
   if (cached) return cached;
-  const url = process.env['SUPABASE_URL'];
-  const key = process.env['SUPABASE_SERVICE_ROLE_KEY'];
-  cached = url && key ? supabaseRepository(url, key) : memoryRepository();
+  // DATABASE_URL first: it works with any Postgres provider, so it is the
+  // portable choice. SUPABASE_URL is kept for existing Supabase deployments.
+  const databaseUrl = process.env['DATABASE_URL'];
+  const supabaseUrl = process.env['SUPABASE_URL'];
+  const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+  cached = databaseUrl
+    ? postgresRepository(databaseUrl)
+    : supabaseUrl && supabaseKey
+      ? supabaseRepository(supabaseUrl, supabaseKey)
+      : memoryRepository();
   return cached;
 }
 

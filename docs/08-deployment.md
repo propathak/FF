@@ -27,12 +27,58 @@ point Vercel at the branch directly in Step 3.
 
 ---
 
-## Step 2 — Create the database
+## Step 2 — Choose a database
 
-**This step is not optional.** Each Vercel serverless invocation is a separate instance, so
-without a shared database the `POST` that creates an audit and the `GET` that polls it can land
-on different machines — the browser would get a 404 for an audit that ran perfectly. The app
-detects this and returns an explicit 503 rather than failing mysteriously.
+The app talks **plain Postgres**. `supabase/migrations/0001_init.sql` is standard SQL — it has
+been verified to apply unchanged to a vanilla PostgreSQL 16 server — so you are not tied to any
+one provider.
+
+Set **`DATABASE_URL`** and the app uses the portable SQL driver. Set `SUPABASE_URL` +
+`SUPABASE_SERVICE_ROLE_KEY` instead and it uses Supabase's REST API. `DATABASE_URL` wins if both
+are present.
+
+### The options
+
+| Provider | Free tier | Paid entry | Idle behaviour | Verdict |
+|---|---|---|---|---|
+| **Neon** | 0.5 GB, 100 compute-hours/month, no card | No monthly minimum since Dec 2025; ~$0.106/CU-hour + $0.35/GB-month | Suspends after 5 min, **~500 ms cold start**, resumes automatically | **Recommended.** The only one whose free tier survives an idle week. |
+| **Supabase** | 0.5 GB, 1 GB storage | $25/month Pro | **Project pauses after a week idle** and needs manual restore | Fine, but the free tier is a trap for a lead-gen site between campaigns |
+| **Railway** | None (a $5 credit, not a free tier) | $5/month Hobby + usage | Always on | Good if you already use Railway |
+| **Render** | 1 GB, but **expires 30 days** after creation, then deleted after a 14-day grace period | ~$7/month | Always on | Avoid — the free database deletes itself |
+| **Self-hosted** (Hetzner, DigitalOcean) | — | ~$5/month VPS | Always on | Cheapest at scale, but you own backups, patching and a connection pooler |
+
+### Why Neon for this app specifically
+
+The thing that makes Supabase Free unusable here — the week-long idle pause — is exactly the
+pattern a lead-generation site has between campaigns. Neon suspends instead of pausing: the first
+request after idle pays about half a second, then it is warm. For a product whose audits already
+take 40 seconds, that is invisible.
+
+It is also a real cost difference at low volume. Supabase's answer to "don't pause" is $25/month.
+Neon has had no monthly minimum since December 2025, so a quiet month genuinely costs a few
+dollars.
+
+### Set up Neon
+
+1. Create a project at [neon.com](https://neon.com). Pick the region closest to your customers.
+2. **SQL Editor** → paste all of
+   [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) → **Run**.
+3. **Connection Details** → copy the **pooled** connection string. It has `-pooler` in the
+   hostname and ends in `?sslmode=require`. Use that one, not the direct string:
+
+   ```
+   DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.REGION.aws.neon.tech/neondb?sslmode=require
+   ```
+
+> **Always use the pooled connection string on Vercel.** Every serverless invocation is its own
+> process. Without pooling, a traffic spike opens hundreds of connections and the server starts
+> refusing them. The app already pins one pool per instance, but the provider's pooler is what
+> makes that safe at scale. The same rule applies to Supabase (use the pooler port) and to a
+> self-hosted server (put PgBouncer in front of it).
+
+### If you prefer Supabase
+
+### Setting it up
 
 1. Create a new Supabase project. Pick the region closest to your customers
    (`ap-south-1` Mumbai for India, `us-east-1` for the US).
@@ -47,6 +93,18 @@ detects this and returns an explicit 503 rather than failing mysteriously.
 
 > The `service_role` key bypasses row-level security. It is only ever read server-side in this
 > app and must never appear in a `NEXT_PUBLIC_*` variable.
+
+> One behavioural difference worth knowing: the Supabase driver's rate limiter is read-then-write,
+> so a simultaneous burst can over-admit by one. The `DATABASE_URL` driver increments atomically
+> in a single statement. Neither is a security control — both are spend controls with wide
+> margins — but it is a second reason to prefer `DATABASE_URL`.
+
+### Whichever you pick, a database is not optional
+
+Each Vercel serverless invocation is a separate instance, so without a shared database the `POST`
+that creates an audit and the `GET` that polls it can land on different machines — the browser
+would get a 404 for an audit that ran perfectly. The app detects this and returns an explicit 503
+rather than failing that way silently.
 
 ---
 
@@ -180,5 +238,8 @@ audit**. Working in [`docs/04-api-research.md`](04-api-research.md).
 - [Vercel function limits](https://vercel.com/docs/functions/limitations) ·
   [configuring max duration](https://vercel.com/docs/functions/configuring-functions/duration)
 - [Connecting a GoDaddy domain to Vercel](https://dev.to/hat52/connecting-your-vercel-app-to-a-godaddy-domain-a-step-by-step-guide-11lc)
+- [Neon pricing](https://neon.com/pricing) · [Neon serverless driver and connection pooling](https://neon.com/docs/serverless/serverless-driver) · [Neon free-tier limits 2026](https://agentdeals.dev/vendor/neon)
 - [Supabase pricing and free-tier pausing](https://uibakery.io/blog/supabase-pricing)
+- [Railway pricing plans](https://docs.railway.com/pricing/plans)
+- [Render: free Postgres now expires after 30 days](https://render.com/changelog/free-postgresql-instances-now-expire-after-30-days-previously-90) · [Render free tier docs](https://render.com/docs/free)
 - [Resend account quotas](https://resend.com/docs/knowledge-base/account-quotas-and-limits)

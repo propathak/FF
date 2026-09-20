@@ -48,7 +48,7 @@ export async function POST(request: Request) {
     return NextResponse.json(
       {
         error:
-          'This deployment has no database configured, so audits cannot be stored reliably. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the project environment variables and redeploy.',
+          'This deployment has no database configured, so audits cannot be stored reliably. Set DATABASE_URL (any Postgres provider) or SUPABASE_URL plus SUPABASE_SERVICE_ROLE_KEY in the project environment variables, then redeploy.',
       },
       { status: 503 },
     );

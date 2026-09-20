@@ -90,8 +90,8 @@ URL → discovery → crawl → parse → enrich → analyse → score → inter
 - **`src/engine/scoring/`** — pure functions, no I/O, no model client. A test enforces this too.
 - **`src/app/api/`** — route handlers. The audit continues after the response flushes so the
   browser renders live stage progress instead of a spinner.
-- **`src/lib/repository.ts`** — persistence behind one interface: an in-memory driver (zero config)
-  and a Supabase driver over PostgREST.
+- **`src/lib/repository.ts`** — persistence behind one interface: an in-memory driver (zero
+  config), a portable SQL driver for any Postgres (`DATABASE_URL`), and a Supabase REST driver.
 - **`supabase/migrations/`** — the full schema, RLS deny-by-default.
 
 **No raw page HTML ever reaches an LLM.** Each page reduces to a ~2 KB typed signal object, so a
@@ -116,7 +116,9 @@ Full working in [`docs/04-api-research.md`](docs/04-api-research.md).
 
 See [`docs/08-deployment.md`](docs/08-deployment.md) for the full walkthrough. The short version:
 
-1. Create a Supabase project and run `supabase/migrations/0001_init.sql`.
+1. Create a Postgres database and run `supabase/migrations/0001_init.sql` — it is standard SQL
+   and works on any provider. [Neon](https://neon.com) is the recommended one; see
+   [`docs/08-deployment.md`](docs/08-deployment.md) §2 for the comparison.
 2. Import the repo at [vercel.com/new](https://vercel.com/new), add the variables from
    [`.env.production.example`](.env.production.example), and enable **Fluid compute**.
 3. Add `indexjoy.com` in Vercel, then create the A and CNAME records it shows you in GoDaddy.
