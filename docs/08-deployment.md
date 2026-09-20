@@ -65,23 +65,22 @@ You do not need a Neon account. Create the database **from inside Vercel**, whic
 
 1. In your Vercel project → **Storage** → **Create Database** → **Neon** (Serverless Postgres)
    → pick a region → **Create**.
-2. Vercel provisions it and injects `DATABASE_URL` (and Neon's other variables) into the project
-   automatically. Nothing to copy, and the pooled string is what it sets.
-3. Apply the schema with one command from your machine:
+2. Vercel provisions it and injects `DATABASE_URL` (pooled) plus a legacy `POSTGRES_URL`. The
+   app reads either, so there is nothing to copy.
+3. Create the tables. Three ways, in order of least effort:
 
-   ```bash
-   npm run db:migrate -- "postgresql://…"      # the string from Vercel → Storage → your database
-   ```
+   | | How |
+   |---|---|
+   | **No terminal** | Deploy first, then open `/admin` and click **Create the tables**. The button appears automatically whenever a database is connected but empty. |
+   | **Vercel dashboard** | Storage → your database → the **Query** tab (not "Browse data", which is the read-only Data tab) → paste [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) → Run. |
+   | **Terminal** | `npx vercel env pull .env.local` then `npm run db:migrate`. |
 
-   Or pull the variables Vercel already set and skip the copy-paste entirely:
+That is the whole step. The migration is idempotent and create-only — it adds tables, indexes and
+enums and never drops or alters data — so running it twice is a no-op. Useful when you are not
+certain the last attempt finished.
 
-   ```bash
-   npx vercel env pull .env.local
-   npm run db:migrate
-   ```
-
-That is the whole step. The migration is idempotent, so running it again is a no-op — useful
-when you are not certain the last attempt finished.
+> The `/admin` button is gated on a Google session whose email is in `ADMIN_EMAILS`. Anonymous
+> and non-admin requests get a 401.
 
 ### Set up Neon — the direct way
 

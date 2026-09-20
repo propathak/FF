@@ -2,7 +2,9 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
 import { adminEmails, isAdminEmail } from '@/lib/admin';
-import { getRepository } from '@/lib/repository';
+import { databaseUrl, getRepository } from '@/lib/repository';
+import { schemaIsReady } from '@/lib/migrate';
+import { DbSetup } from '@/components/db-setup';
 import { scoreLead, signalsFromAudit } from '@/lib/lead-score';
 import { Badge, Card, StatusIcon } from '@/components/ui/primitives';
 import { toneVarForScore } from '@/lib/tone';
@@ -42,6 +44,17 @@ export default async function AdminPage() {
               : `${email} is not on the administrator list.`}
           </p>
         </Card>
+      </div>
+    );
+  }
+
+  // Before touching the tables, check they exist — otherwise the first query
+  // throws a raw Postgres error at somebody who just wants to finish setup.
+  const url = databaseUrl();
+  if (!url || !(await schemaIsReady(url))) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-20">
+        <DbSetup connected={Boolean(url)} />
       </div>
     );
   }

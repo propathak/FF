@@ -115,6 +115,29 @@ maybe('postgres repository driver', () => {
     expect(after.find((l) => l.id === lead.id)?.status).toBe('meeting_booked');
   });
 
+  it('reports the schema as ready and counts its tables', async () => {
+    const { schemaIsReady, countTables } = await import('@/lib/migrate');
+    expect(await schemaIsReady(URL as string)).toBe(true);
+    expect(await countTables(URL as string)).toBeGreaterThanOrEqual(17);
+  });
+
+  it('reports not-ready rather than throwing when the database is unreachable', async () => {
+    const { schemaIsReady, countTables } = await import('@/lib/migrate');
+    const dead = 'postgresql://nobody:nobody@127.0.0.1:1/none';
+    // The admin page calls this before touching any table, so it must fail
+    // soft — a raw Postgres error at somebody mid-setup is a dead end.
+    expect(await schemaIsReady(dead)).toBe(false);
+    expect(await countTables(dead)).toBeNull();
+  });
+
+  it('applies the schema idempotently', async () => {
+    const { applyMigrations } = await import('@/lib/migrate');
+    // Already migrated by the test harness; running it again must be a no-op.
+    const result = await applyMigrations(URL as string);
+    expect(result.applied.length).toBeGreaterThan(0);
+    expect(result.tableCount).toBeGreaterThanOrEqual(17);
+  });
+
   it('enforces a rate limit atomically', async () => {
     const key = `test-${Date.now()}`;
     const results = await Promise.all(
