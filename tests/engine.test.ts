@@ -1,6 +1,9 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { runAudit } from '@/engine/pipeline';
-import { goodSite, poorSite, startFixtureServer, type FixtureServer } from './fixtures/site';
+import {
+  challengedSite, clientRenderedSite, goodSite, poorSite, startFixtureServer,
+  type FixtureServer,
+} from './fixtures/site';
 
 const ENV = { AUDIT_ALLOW_LOCAL: '1' };
 
@@ -116,4 +119,43 @@ describe('audit pipeline (end to end against a fixture site)', () => {
     // Competitors are never scored on enriched signals the primary site had.
     expect(competitor?.ai).toBeNull();
   }, 90_000);
+});
+
+describe('sites with no server-rendered text', () => {
+  /**
+   * These two are identical on a word count and opposite in meaning. Telling
+   * them apart is the difference between withholding the most valuable
+   * finding the audit has, and inventing a verdict about a page nobody saw.
+   */
+  it('reports a client-rendered site instead of refusing it', async () => {
+    const site = await startFixtureServer(clientRenderedSite());
+    try {
+      const result = await runAudit(
+        { auditId: 'csr', url: site.origin, maxPages: 5 },
+        { env: ENV },
+      );
+
+      const csr = result.checks.find((c) => c.id === 'seo.index.csr_dependency');
+      expect(csr?.status).toBe('fail');
+      // The finding has to be prominent, not buried among 40 others.
+      const { rankFindings } = await import('@/engine/scoring/score');
+      const top = rankFindings(result.checks, result.pillars).slice(0, 5).map((c) => c.id);
+      expect(top).toContain('seo.index.csr_dependency');
+      // And it must not be quietly scored as an average site.
+      expect(result.overall.score).toBeLessThan(45);
+    } finally {
+      await site.close();
+    }
+  });
+
+  it('refuses a site behind bot protection, and names the vendor', async () => {
+    const site = await startFixtureServer(challengedSite());
+    try {
+      await expect(
+        runAudit({ auditId: 'challenged', url: site.origin, maxPages: 5 }, { env: ENV }),
+      ).rejects.toThrow(/Cloudflare/);
+    } finally {
+      await site.close();
+    }
+  });
 });

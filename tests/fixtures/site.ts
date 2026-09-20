@@ -231,3 +231,46 @@ export function poorSite(): FixtureRoute[] {
     page('/'), page('/one'), page('/two'), page('/three'),
   ];
 }
+
+/**
+ * A site that renders entirely in the browser: real HTML, a real title, a
+ * mount point, script bundles — and no content whatsoever in the served
+ * markup. This is not a broken crawl, it is the site, and it is the worst
+ * thing that can be true of a page's AI visibility.
+ */
+export function clientRenderedSite(): FixtureRoute[] {
+  const shell = `<!doctype html><html lang="en"><head>
+    <title>Loanwalle — Instant personal loans</title>
+    <meta name="description" content="Compare and apply for personal loans online.">
+    <link rel="canonical" href="https://loanwalle.example/">
+  </head><body>
+    <div id="root"></div>
+    <script src="/static/js/runtime.js"></script>
+    <script src="/static/js/vendor.js"></script>
+    <script src="/static/js/main.js"></script>
+    <script src="/static/js/chunk.js"></script>
+  </body></html>`;
+  return [
+    { path: '/', body: shell },
+    { path: '/robots.txt', contentType: 'text/plain', body: 'User-agent: *\nAllow: /\n' },
+  ];
+}
+
+/**
+ * What a bot-protection vendor serves instead of the site: HTTP 200, almost
+ * no text, and nothing to do with the business. Indistinguishable from the
+ * fixture above on a word count, which is why both used to be refused.
+ */
+export function challengedSite(): FixtureRoute[] {
+  const interstitial = `<!doctype html><html><head><title>Just a moment...</title>
+    <meta http-equiv="refresh" content="35">
+  </head><body class="no-js">
+    <div id="cf-wrapper"><div class="cf-browser-verification cf-im-under-attack">
+    <p>Checking your browser before accessing the site.</p></div></div>
+    <script src="/cdn-cgi/challenge-platform/h/b/orchestrate/jsch/v1"></script>
+  </body></html>`;
+  return [
+    { path: '/', body: interstitial },
+    { path: '/robots.txt', contentType: 'text/plain', body: 'User-agent: *\nAllow: /\n' },
+  ];
+}

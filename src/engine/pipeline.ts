@@ -166,14 +166,18 @@ async function auditCompetitor(
     const { pages, discoveredUrlCount } = await crawlSite(
       discovery.resolvedUrl, discovery.robots, discovery.sitemap, fetcher, { maxPages },
     );
-    // Same rule as the primary audit: no readable content, no score.
-    if (!pages.some((p) => p.statusCode >= 200 && p.statusCode < 300 && p.wordCount > 0)) {
+    // Same rule as the primary audit: a challenge page is not the site, but a
+    // client-rendered one is.
+    if (!pages.some((p) => p.statusCode >= 200 && p.statusCode < 300 && !p.botChallenge)) {
+      const vendor = pages.find((p) => p.botChallenge)?.botChallengeVendor;
       return {
         host, source: 'user', status: 'failed', seo: null, aeo: null, geo: null, ai: null,
         overall: null, pagesCrawled: 0,
-        error: discovery.homepageStatus >= 400
-          ? `Blocked automated access (HTTP ${discovery.homepageStatus})`
-          : 'No readable content could be crawled',
+        error: vendor
+          ? `Behind ${vendor} bot protection`
+          : discovery.homepageStatus >= 400
+            ? `Blocked automated access (HTTP ${discovery.homepageStatus})`
+            : 'Nothing parseable could be crawled',
       };
     }
 
@@ -247,23 +251,36 @@ export async function runAudit(input: AuditInput, deps: AuditDeps = {}): Promise
     },
   );
   /**
-   * A crawl that returned only error pages must never produce a score. Scoring
-   * a blocked site yields a confident, completely fabricated report — the exact
-   * failure mode this product exists to avoid.
+   * A crawl that saw nothing of the real site must never produce a score.
+   * Scoring a blocked site yields a confident, completely fabricated report —
+   * the exact failure mode this product exists to avoid.
+   *
+   * "Nothing of the real site" is narrower than "no words". A page served by
+   * a bot-protection vendor is not the site, so it is refused. A page that is
+   * genuinely empty because the site renders entirely in the browser IS the
+   * site, and gets a real report: that fact is the single most damaging thing
+   * that can be true of a site's AI visibility, and the checks already
+   * measure it (seo.index.csr_dependency). Refusing it withheld the most
+   * valuable finding the audit had.
    */
-  const readable = pages.filter((p) => p.statusCode >= 200 && p.statusCode < 300 && p.wordCount > 0);
-  if (readable.length === 0) {
+  const analysable = pages.filter(
+    (p) => p.statusCode >= 200 && p.statusCode < 300 && !p.botChallenge,
+  );
+  if (analysable.length === 0) {
     const status = discovery.homepageStatus;
     const blocked = status === 403 || status === 401 || status === 429 || status === 503;
+    const vendor = pages.find((p) => p.botChallenge)?.botChallengeVendor;
     throw new Error(
-      blocked
-        ? `${discovery.host} returned HTTP ${status} and refused our request. The site is blocking automated access, so we cannot audit it without being allowlisted. We will not guess a score from a blocked crawl.`
-        : status === 0
-          ? `We could not reach ${discovery.host}. The domain may be unreachable, or the request timed out.`
-          : `We reached ${discovery.host} (HTTP ${status}) but could not read any readable content from it. This usually means the site is blocking automated requests or serves no server-rendered content at all.`,
+      vendor
+        ? `${discovery.host} is behind ${vendor} bot protection, which served a verification page instead of the site. We cannot audit what we were not shown, and we will not guess a score from it. Allowlisting our crawler (IndexJoyBot) would let the audit run.`
+        : blocked
+          ? `${discovery.host} returned HTTP ${status} and refused our request. The site is blocking automated access, so we cannot audit it without being allowlisted. We will not guess a score from a blocked crawl.`
+          : status === 0
+            ? `We could not reach ${discovery.host}. The domain may be unreachable, or the request timed out.`
+            : `We reached ${discovery.host} (HTTP ${status}) but it returned nothing we could parse as a web page.`,
     );
   }
-  emit(stageEvent('crawl', 'done', STAGE_LABELS.crawl, `${readable.length} of ${discoveredUrlCount} URLs read`));
+  emit(stageEvent('crawl', 'done', STAGE_LABELS.crawl, `${analysable.length} of ${discoveredUrlCount} URLs read`));
 
   // --- Stage 3: parse / brand profiling -----------------------------------
   emit(stageEvent('parse', 'running', STAGE_LABELS.parse));

@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { detectBotChallenge } from './challenge';
 import type { HeadingNode, PageSignals, QuestionHeading } from '../types';
 import { canonicaliseUrl, looksLikeHtmlUrl, sameSite } from '../util/url';
 import {
@@ -166,10 +167,16 @@ export function parsePage(url: string, depth: number, res: FetchResult): PageSig
     questionHeadings: [], definitionBlocks: 0, statisticClaims: 0,
     quotablePassages: 0, blockquotes: 0,
     datePublished: null, dateModified: null, authorName: null, hasAuthorSchema: false,
-    csrDependent: false, shingles: [], excerpt: '',
+    csrDependent: false, botChallenge: false, botChallengeVendor: null, shingles: [], excerpt: '',
   };
 
   if (!res.ok || !res.body || !/html/i.test(res.contentType || '')) return base;
+
+  // Before anything is measured: a challenge page parses perfectly well and
+  // would otherwise be scored as a real, extremely thin page.
+  const challenge = detectBotChallenge(res.body);
+  base.botChallenge = challenge.isChallenge;
+  base.botChallengeVendor = challenge.vendor;
 
   const $ = cheerio.load(res.body);
   const htmlLength = res.body.length;

@@ -169,6 +169,12 @@ export interface PageSignals {
 
   /** Client-side-rendering dependency: served HTML carries almost no content. */
   csrDependent: boolean;
+  /**
+   * A bot-protection interstitial rather than the site. Distinct from
+   * csrDependent, which also has little text but IS the site.
+   */
+  botChallenge: boolean;
+  botChallengeVendor: string | null;
 
   /** Hashed 5-gram shingles for near-duplicate detection between pages. */
   shingles: number[];
