@@ -2,10 +2,30 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { auth, signIn } from '@/auth';
 import { Card } from '@/components/ui/primitives';
+import { authConfigStatus, googleRedirectUri } from '@/lib/auth-config';
+import { requestOrigin } from '@/lib/request-origin';
 
 export const metadata: Metadata = {
   title: 'Sign in',
   robots: { index: false, follow: false },
+};
+
+/**
+ * Auth.js reports failures by bouncing back here with `?error=<code>`. Left
+ * unexplained these all read as "something went wrong", which sends people
+ * looking in the wrong place — most of these codes point at a setting, not at
+ * the visitor's account.
+ */
+const ERROR_MESSAGES: Record<string, string> = {
+  Configuration:
+    'Sign-in is not finished being set up. The Google client ID and secret need to be added to this deployment.',
+  AccessDenied: 'That account could not be signed in. Google returned no email address for it.',
+  Verification: 'That sign-in link has already been used or has expired. Please try again.',
+  OAuthSignin: 'We could not reach Google to start sign-in. Please try again in a moment.',
+  OAuthCallback:
+    'Google rejected the sign-in. This is usually the redirect URI on the Google side not matching this address exactly.',
+  OAuthAccountNotLinked:
+    'That email address is already signed in through a different method. Use the original method.',
 };
 
 export default async function SignInPage({
@@ -16,6 +36,9 @@ export default async function SignInPage({
   const { callbackUrl, error } = await searchParams;
   const session = await auth();
   if (session?.user) redirect(callbackUrl ?? '/');
+
+  const status = authConfigStatus();
+  const origin = await requestOrigin();
 
   return (
     <div className="mx-auto flex max-w-md flex-col justify-center px-4 py-20">
@@ -28,38 +51,97 @@ export default async function SignInPage({
 
         {error && (
           <p
-            className="mt-4 rounded-lg px-3 py-2 text-sm"
+            className="mt-4 rounded-lg px-3 py-2 text-left text-sm leading-relaxed"
             role="alert"
             style={{ background: 'var(--status-critical-soft)', color: 'var(--status-critical)' }}
           >
-            {error === 'AccessDenied'
-              ? 'That account could not be signed in.'
-              : 'Something went wrong signing in. Please try again.'}
+            {ERROR_MESSAGES[error] ?? 'Something went wrong signing in. Please try again.'}
           </p>
         )}
 
-        <form
-          className="mt-6"
-          action={async () => {
-            'use server';
-            await signIn('google', { redirectTo: callbackUrl ?? '/' });
-          }}
-        >
-          <button
-            type="submit"
-            className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-lg border text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
-            style={{ background: 'var(--surface-0)', color: 'var(--text-primary)' }}
-          >
-            <GoogleMark />
-            Continue with Google
-          </button>
-        </form>
+        {status.ready ? (
+          <>
+            <form
+              className="mt-6"
+              action={async () => {
+                'use server';
+                await signIn('google', { redirectTo: callbackUrl ?? '/' });
+              }}
+            >
+              <button
+                type="submit"
+                className="inline-flex h-11 w-full items-center justify-center gap-3 rounded-lg border text-sm font-medium transition-colors hover:bg-[var(--surface-2)]"
+                style={{ background: 'var(--surface-0)', color: 'var(--text-primary)' }}
+              >
+                <GoogleMark />
+                Continue with Google
+              </button>
+            </form>
 
-        <p className="mt-5 text-xs" style={{ color: 'var(--text-muted)' }}>
-          We store your email address and the websites you audit, so you can come back to your
-          reports. Nothing else.
-        </p>
+            <p className="mt-5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              We store your email address and the websites you audit, so you can come back to your
+              reports. Nothing else.
+            </p>
+          </>
+        ) : (
+          <SetupNeeded missing={status.missing} origin={origin} />
+        )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Shown instead of the Google button when the credentials are not set.
+ *
+ * Without this the button still renders and still redirects, but Google answers
+ * with "Error 401: invalid_client", which reads as a Google outage rather than
+ * an unfinished setup. Better to say so here, and to print the exact redirect
+ * URI this deployment will send, since that string has to be registered
+ * character for character on the Google side.
+ */
+function SetupNeeded({ missing, origin }: { missing: string[]; origin: string }) {
+  return (
+    <div
+      className="mt-6 rounded-lg border px-4 py-4 text-left"
+      style={{ background: 'var(--surface-2)' }}
+    >
+      <p className="text-sm font-medium">Google sign-in is not set up yet</p>
+      <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        This deployment is missing {missing.length === 1 ? 'one setting' : `${missing.length} settings`}:
+      </p>
+      <ul className="mt-2 space-y-1">
+        {missing.map((name) => (
+          <li key={name} className="font-mono text-xs" style={{ color: 'var(--status-critical)' }}>
+            {name}
+          </li>
+        ))}
+      </ul>
+      <p className="mt-4 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+        Create an OAuth client at{' '}
+        <a
+          className="underline"
+          href="https://console.cloud.google.com/apis/credentials"
+          target="_blank"
+          rel="noreferrer"
+        >
+          console.cloud.google.com/apis/credentials
+        </a>
+        , then add its ID and secret to this project&rsquo;s environment variables and redeploy.
+      </p>
+      <p className="mt-3 text-xs" style={{ color: 'var(--text-secondary)' }}>
+        The Google client&rsquo;s <strong>Authorised redirect URI</strong> must be exactly:
+      </p>
+      <code
+        className="mt-1 block break-all rounded px-2 py-1.5 font-mono text-xs"
+        style={{ background: 'var(--surface-0)' }}
+      >
+        {googleRedirectUri(origin)}
+      </code>
+      <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        And the <strong>Authorised JavaScript origin</strong> must be exactly{' '}
+        <span className="font-mono">{origin}</span>.
+      </p>
     </div>
   );
 }

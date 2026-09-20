@@ -72,10 +72,22 @@ Open it in Google Sheets, or **File → Download → Microsoft Excel (.xlsx)** f
      sign in, which looks like a broken site to everyone else.
 3. **APIs & Services → Credentials → Create credentials → OAuth client ID**
    - Type: **Web application**
-   - Authorised JavaScript origins: `https://indexjoy.com`
-   - Authorised redirect URIs — add **both**:
+   - Authorised JavaScript origins — add every address the site answers on:
+     - `https://indexjoy.com`
+     - your Vercel address, e.g. `https://ff-xxxx.vercel.app`
+     - `http://localhost:3000` (for local development)
+   - Authorised redirect URIs — the same addresses, each with
+     `/api/auth/callback/google` on the end:
      - `https://indexjoy.com/api/auth/callback/google`
-     - `http://localhost:3000/api/auth/callback/google` (for local development)
+     - `https://ff-xxxx.vercel.app/api/auth/callback/google`
+     - `http://localhost:3000/api/auth/callback/google`
+
+   > Google matches these strings exactly. A different host, a missing `s` in
+   > `https`, or a trailing slash is a different URI and gets rejected. Before the
+   > custom domain is connected you are testing on the `.vercel.app` address, so
+   > registering only `indexjoy.com` fails every time. **If you are not sure what
+   > to paste, open `/signin` on the deployment — while the credentials are
+   > missing, that page prints the exact two strings for the address you are on.**
 4. Copy the client ID and secret into Vercel:
 
    ```
@@ -90,6 +102,24 @@ and never reuse it across environments — a leaked one lets somebody forge a se
 
 `ADMIN_EMAILS` is who can open `/admin`. It fails closed: leave it empty and nobody
 gets in, including you.
+
+---
+
+## When sign-in does not work
+
+Match the symptom, not the guess. Each of these has one cause.
+
+| What you see | What it means | Fix |
+|---|---|---|
+| **Error 401: invalid_client — The OAuth client was not found** | `AUTH_GOOGLE_ID` is not set on the deployment. Auth.js sends `client_id=undefined` to Google rather than raising an error, so it looks like a Google fault. | Add `AUTH_GOOGLE_ID` and `AUTH_GOOGLE_SECRET` in Vercel, then **redeploy** — environment variables only reach a build that runs after they are saved. |
+| **Error 400: redirect_uri_mismatch** | The address you are on is not registered on the Google client. Usually a `.vercel.app` address when only `indexjoy.com` was added. | Add that exact address to both lists in Part 1, step 3. Google applies the change within a few minutes. |
+| **Access blocked: … has not completed the Google verification process** | The consent screen is still in **Testing**. | Publish the app (Part 1, step 2), or add the account under **Test users**. |
+| **Bounced back to `/signin` with "not finished being set up"** | The credentials are genuinely absent — the sign-in page checked before redirecting. | The page lists the missing variable names. Set them and redeploy. |
+| **Sign-in completes but nothing reaches the sheet** | The Sheets side (Part 2) is separate and deliberately silent on failure. | Confirm the Sheets API is enabled and the sheet is shared with the service account. Sign-in and audits are unaffected. |
+
+Saving a variable in Vercel does not change the running site. After any change to
+`AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` or `AUTH_SECRET`, go to **Deployments → ⋯ →
+Redeploy** on the newest deployment.
 
 ---
 
