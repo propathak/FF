@@ -1,7 +1,7 @@
 import { NextResponse, after } from 'next/server';
 import { z } from 'zod';
 import { normaliseInputUrl } from '@/engine/util/url';
-import { getRepository } from '@/lib/repository';
+import { getRepository, isEphemeralInProduction } from '@/lib/repository';
 import { createAuditRecord, executeAudit, hashIp, newAuditId } from '@/lib/audit-runner';
 
 export const runtime = 'nodejs';
@@ -38,6 +38,19 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: `"${parsed.data.url}" does not look like a public website address.` },
       { status: 400 },
+    );
+  }
+
+  // Refuse rather than accept an audit we know we will lose. See
+  // isEphemeralInProduction() — without a database, the poll can hit a
+  // different instance than the write and 404 on a perfectly good audit.
+  if (isEphemeralInProduction()) {
+    return NextResponse.json(
+      {
+        error:
+          'This deployment has no database configured, so audits cannot be stored reliably. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in the project environment variables and redeploy.',
+      },
+      { status: 503 },
     );
   }
 

@@ -303,6 +303,19 @@ function supabaseRepository(url: string, serviceKey: string): Repository {
 
 let cached: Repository | null = null;
 
+/**
+ * True when the app is running without a durable store on a platform where
+ * each request may land on a different instance.
+ *
+ * This combination is silently broken rather than obviously broken: the POST
+ * that creates an audit and the GET that polls it can hit different lambdas, so
+ * the browser gets a 404 for an audit that was created successfully. The API
+ * checks this and returns an actionable error instead.
+ */
+export function isEphemeralInProduction(): boolean {
+  return getRepository().driver === 'memory' && process.env.NODE_ENV === 'production';
+}
+
 export function getRepository(): Repository {
   if (cached) return cached;
   const url = process.env['SUPABASE_URL'];

@@ -10,10 +10,11 @@ export const CRAWL_DEFAULTS = {
   pageTimeoutMs: 10_000,
   maxBodyBytes: 2_000_000,
   // Wikimedia and several other hosts bucket non-contactable agents into a
-  // restrictive rate-limit tier, so the URL and address below must be REAL and
-  // monitored before this runs in production — replace the .example values.
+  // restrictive rate-limit tier, so both the URL and the address must resolve.
+  // /bot is a real page in this app; crawler@indexjoy.com must be a monitored
+  // inbox before this crawls at volume.
   userAgent:
-    'IndexJoyBot/1.0 (+https://indexjoy.example/bot; visibility audit; contact@indexjoy.example)',
+    'IndexJoyBot/1.0 (+https://indexjoy.com/bot; visibility audit; crawler@indexjoy.com)',
 } as const;
 
 /**

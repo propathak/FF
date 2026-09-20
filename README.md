@@ -75,6 +75,7 @@ npm run build
 | [`docs/05-database.md`](docs/05-database.md) | Schema design and the reasoning behind each decision |
 | [`docs/06-limitations.md`](docs/06-limitations.md) | What cannot be measured and why — the product's main credibility asset |
 | [`docs/07-roadmap.md`](docs/07-roadmap.md) | Phases 1–4, with the sequencing risk that would make me reorder them |
+| [`docs/08-deployment.md`](docs/08-deployment.md) | Deploying to **indexjoy.com** — Vercel, Supabase and GoDaddy DNS, step by step |
 
 ---
 
@@ -110,6 +111,19 @@ Paid enrichment fires only for qualified runs, so cost is incurred on leads rath
 Full working in [`docs/04-api-research.md`](docs/04-api-research.md).
 
 ---
+
+## Deploying
+
+See [`docs/08-deployment.md`](docs/08-deployment.md) for the full walkthrough. The short version:
+
+1. Create a Supabase project and run `supabase/migrations/0001_init.sql`.
+2. Import the repo at [vercel.com/new](https://vercel.com/new), add the variables from
+   [`.env.production.example`](.env.production.example), and enable **Fluid compute**.
+3. Add `indexjoy.com` in Vercel, then create the A and CNAME records it shows you in GoDaddy.
+
+A database is **required** in production: each serverless invocation is a separate instance, so
+without one the audit that gets written by one request would 404 when polled by another. The API
+returns an explicit 503 rather than failing that way silently.
 
 ## Status
 
