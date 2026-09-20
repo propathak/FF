@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
-import { adminEmails, isAdminEmail } from '@/lib/admin';
+import { adminEmails, isAdminEmail, maySetUpSchema } from '@/lib/admin';
 import { databaseUrl, getRepository } from '@/lib/repository';
 import { schemaIsReady } from '@/lib/migrate';
 import { DbSetup } from '@/components/db-setup';
@@ -33,7 +33,14 @@ export default async function AdminPage() {
 
   if (!email) redirect('/signin?callbackUrl=%2Fadmin');
 
-  if (!isAdminEmail(email)) {
+  // Checked before the admin rule, because an unfinished database changes who
+  // is allowed to see this page. Otherwise ADMIN_EMAILS — itself an
+  // environment variable — can lock an operator out of the only screen that
+  // lets them finish setting the deployment up.
+  const url = databaseUrl();
+  const ready = Boolean(url) && (await schemaIsReady(url as string));
+
+  if (!maySetUpSchema(email, ready)) {
     return (
       <div className="mx-auto max-w-md px-4 py-24">
         <Card>
@@ -48,13 +55,26 @@ export default async function AdminPage() {
     );
   }
 
-  // Before touching the tables, check they exist — otherwise the first query
-  // throws a raw Postgres error at somebody who just wants to finish setup.
-  const url = databaseUrl();
-  if (!url || !(await schemaIsReady(url))) {
+  if (!ready) {
     return (
       <div className="mx-auto max-w-lg px-4 py-20">
         <DbSetup connected={Boolean(url)} />
+      </div>
+    );
+  }
+
+  // Past this point the schema exists, so the relaxed rule no longer applies
+  // and the dashboard itself stays admin-only.
+  if (!isAdminEmail(email)) {
+    return (
+      <div className="mx-auto max-w-md px-4 py-24">
+        <Card>
+          <h1 className="text-lg font-semibold">Database is ready</h1>
+          <p className="mt-2 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+            The tables exist, so audits will run. This dashboard is restricted &mdash; add{' '}
+            {email} to ADMIN_EMAILS and redeploy to see the lead list here.
+          </p>
+        </Card>
       </div>
     );
   }

@@ -109,3 +109,40 @@ describe('durable-store guard', () => {
     expect(isEphemeralInProduction()).toBe(false);
   });
 });
+
+describe('schema setup permission', () => {
+  /**
+   * The deadlock this guards against is real, not hypothetical: on the first
+   * live deployment ADMIN_EMAILS was saved blank, which locked the operator
+   * out of /admin — the only screen that could create the tables that /admin
+   * needed to show anything.
+   */
+  it('lets any signed-in account finish setup while the database is empty', async () => {
+    const { maySetUpSchema } = await import('@/lib/admin');
+    expect(maySetUpSchema('anyone@gmail.com', false)).toBe(true);
+  });
+
+  it('closes that exception the moment the schema exists', async () => {
+    vi.stubEnv('ADMIN_EMAILS', '');
+    vi.resetModules();
+    const { maySetUpSchema } = await import('@/lib/admin');
+    expect(maySetUpSchema('anyone@gmail.com', true)).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it('still admits a configured admin once the schema exists', async () => {
+    vi.stubEnv('ADMIN_EMAILS', 'owner@example.com');
+    vi.resetModules();
+    const { maySetUpSchema } = await import('@/lib/admin');
+    expect(maySetUpSchema('owner@example.com', true)).toBe(true);
+    expect(maySetUpSchema('someone@else.com', true)).toBe(false);
+    vi.unstubAllEnvs();
+  });
+
+  it('never admits an anonymous visitor, empty database or not', async () => {
+    const { maySetUpSchema } = await import('@/lib/admin');
+    expect(maySetUpSchema(null, false)).toBe(false);
+    expect(maySetUpSchema(undefined, false)).toBe(false);
+    expect(maySetUpSchema('', false)).toBe(false);
+  });
+});
