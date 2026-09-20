@@ -16,8 +16,11 @@ const MIGRATIONS_DIR = join(process.cwd(), 'supabase', 'migrations');
 
 function connectionString(): string {
   const url =
+    process.argv.find((a) => a.startsWith('postgres://') || a.startsWith('postgresql://')) ||
+    // Vercel's Neon integration sets DATABASE_URL; some integrations set only
+    // the legacy POSTGRES_URL. Accept either.
     process.env['DATABASE_URL'] ||
-    process.argv.find((a) => a.startsWith('postgres://') || a.startsWith('postgresql://'));
+    process.env['POSTGRES_URL'];
   if (url) return url;
 
   console.error(`

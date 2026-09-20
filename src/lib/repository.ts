@@ -504,11 +504,23 @@ export function isEphemeralInProduction(): boolean {
   return getRepository().driver === 'memory' && process.env.NODE_ENV === 'production';
 }
 
+/**
+ * Connection string, in precedence order.
+ *
+ * Vercel's Neon integration sets `DATABASE_URL` (pooled) and also a legacy
+ * `POSTGRES_URL`; other integrations set only the legacy name. Reading both
+ * means a correctly provisioned database is never missed over a variable-name
+ * mismatch, which would surface as the "no database configured" 503.
+ */
+export function databaseUrl(): string | undefined {
+  return process.env['DATABASE_URL'] || process.env['POSTGRES_URL'] || undefined;
+}
+
 export function getRepository(): Repository {
   if (cached) return cached;
-  // DATABASE_URL first: it works with any Postgres provider, so it is the
-  // portable choice. SUPABASE_URL is kept for existing Supabase deployments.
-  const databaseUrl = process.env['DATABASE_URL'];
+  // A connection string first: it works with any Postgres provider, so it is
+  // the portable choice. SUPABASE_URL is kept for existing Supabase deployments.
+  const databaseUrl = process.env['DATABASE_URL'] || process.env['POSTGRES_URL'];
   const supabaseUrl = process.env['SUPABASE_URL'];
   const supabaseKey = process.env['SUPABASE_SERVICE_ROLE_KEY'];
   cached = databaseUrl

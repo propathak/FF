@@ -88,6 +88,18 @@ describe('durable-store guard', () => {
     expect(isEphemeralInProduction()).toBe(false);
   });
 
+  it('accepts the legacy POSTGRES_URL some integrations set instead', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+    vi.stubEnv('DATABASE_URL', '');
+    vi.stubEnv('POSTGRES_URL', 'postgresql://user:pass@ep-x-pooler.aws.neon.tech/neondb');
+    vi.resetModules();
+    const { isEphemeralInProduction, getRepository } = await import('@/lib/repository');
+    // A correctly provisioned database must never be missed over a
+    // variable-name mismatch — that would surface as a confusing 503.
+    expect(getRepository().driver).toBe('postgres');
+    expect(isEphemeralInProduction()).toBe(false);
+  });
+
   it('does not flag production once Supabase is configured', async () => {
     vi.stubEnv('NODE_ENV', 'production');
     vi.stubEnv('SUPABASE_URL', 'https://project.supabase.co');
