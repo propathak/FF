@@ -60,7 +60,7 @@ AUDIT_ALLOW_LOCAL=1 npm run dev
 ### Tests
 
 ```bash
-npm test         # 62 tests: end-to-end pipeline, scoring, robots, text, purity
+npm test         # 82 tests; 89 with a database attached via TEST_DATABASE_URL
 npm run build
 ```
 
@@ -119,9 +119,15 @@ Full working in [`docs/04-api-research.md`](docs/04-api-research.md).
 
 See [`docs/08-deployment.md`](docs/08-deployment.md) for the full walkthrough. The short version:
 
-1. Create a Postgres database and run `supabase/migrations/0001_init.sql` — it is standard SQL
-   and works on any provider. [Neon](https://neon.com) is the recommended one; see
-   [`docs/08-deployment.md`](docs/08-deployment.md) §2 for the comparison.
+1. Create a Postgres database, then apply the schema with one command:
+
+   ```bash
+   npm run db:migrate -- "postgresql://…"
+   ```
+
+   It is standard SQL and works on any provider — and it is idempotent, so re-running is a
+   no-op. The quickest route is Vercel → **Storage → Create Database → Neon**, which provisions
+   it and sets `DATABASE_URL` for you. See [`docs/08-deployment.md`](docs/08-deployment.md) §2.
 2. Import the repo at [vercel.com/new](https://vercel.com/new), add the variables from
    [`.env.production.example`](.env.production.example), and enable **Fluid compute**.
 3. Add `indexjoy.com` in Vercel, then create the A and CNAME records it shows you in GoDaddy.

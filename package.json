@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "audit:cli": "tsx scripts/run-audit.ts",
     "fixture": "tsx scripts/fixture-server.ts",
-    "fixture:poor": "tsx scripts/fixture-server-poor.ts"
+    "fixture:poor": "tsx scripts/fixture-server-poor.ts",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.68.0",

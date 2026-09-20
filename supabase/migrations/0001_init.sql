@@ -1,24 +1,59 @@
 -- ---------------------------------------------------------------------------
 -- Index Joy — initial schema
+--
+-- Safe to run more than once: every object is guarded, so re-running after a
+-- partial failure or against an existing database is a no-op rather than an
+-- error. Apply it with `npm run db:migrate` (or paste it into any SQL editor).
+--
 -- See docs/05-database.md for the reasoning behind each decision.
 -- ---------------------------------------------------------------------------
 
 create extension if not exists "pgcrypto";
 
 -- --- enums -----------------------------------------------------------------
-create type audit_status   as enum ('queued', 'running', 'complete', 'failed');
-create type audit_mode     as enum ('A', 'B', 'C');
-create type pillar         as enum ('seo', 'aeo', 'geo', 'ai');
-create type finding_status as enum ('pass', 'warn', 'fail', 'opportunity', 'not_applicable', 'unavailable');
-create type rec_horizon    as enum ('now', '30d', '90d');
-create type level          as enum ('High', 'Medium', 'Low');
-create type lead_status    as enum ('new_lead', 'contacted', 'meeting_booked', 'proposal_sent', 'client', 'lost');
-create type lead_grade     as enum ('A', 'B', 'C', 'D');
-create type user_role      as enum ('admin', 'analyst', 'client');
-create type stage_status   as enum ('pending', 'running', 'done', 'failed', 'skipped');
+do $$ begin
+  create type audit_status as enum ('queued', 'running', 'complete', 'failed');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type audit_mode as enum ('A', 'B', 'C');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type pillar as enum ('seo', 'aeo', 'geo', 'ai');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type finding_status as enum ('pass', 'warn', 'fail', 'opportunity', 'not_applicable', 'unavailable');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type rec_horizon as enum ('now', '30d', '90d');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type level as enum ('High', 'Medium', 'Low');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type lead_status as enum ('new_lead', 'contacted', 'meeting_booked', 'proposal_sent', 'client', 'lost');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type lead_grade as enum ('A', 'B', 'C', 'D');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type user_role as enum ('admin', 'analyst', 'client');
+exception when duplicate_object then null;
+end $$;
+do $$ begin
+  create type stage_status as enum ('pending', 'running', 'done', 'failed', 'skipped');
+exception when duplicate_object then null;
+end $$;
 
 -- --- identity --------------------------------------------------------------
-create table users (
+create table if not exists users (
   id          uuid primary key default gen_random_uuid(),
   email       text not null unique,
   name        text,
@@ -26,7 +61,7 @@ create table users (
   created_at  timestamptz not null default now()
 );
 
-create table brands (
+create table if not exists brands (
   id              uuid primary key default gen_random_uuid(),
   name            text not null,
   category        text,
@@ -38,7 +73,7 @@ create table brands (
 );
 
 -- A brand can own several domains (ccTLDs, microsites, acquisitions).
-create table domains (
+create table if not exists domains (
   id          uuid primary key default gen_random_uuid(),
   brand_id    uuid not null references brands(id) on delete cascade,
   host        text not null,
@@ -49,7 +84,7 @@ create table domains (
 );
 
 -- --- audits ----------------------------------------------------------------
-create table audits (
+create table if not exists audits (
   id                 uuid primary key default gen_random_uuid(),
   domain_id          uuid references domains(id) on delete set null,
   brand_id           uuid references brands(id) on delete set null,
@@ -83,12 +118,12 @@ create table audits (
   completed_at       timestamptz
 );
 
-create index audits_domain_created_idx on audits (domain_id, created_at desc);
-create index audits_host_created_idx   on audits (host, created_at desc);
-create index audits_status_idx         on audits (status) where status in ('queued', 'running');
+create index if not exists audits_domain_created_idx on audits (domain_id, created_at desc);
+create index if not exists audits_host_created_idx   on audits (host, created_at desc);
+create index if not exists audits_status_idx         on audits (status) where status in ('queued', 'running');
 
 -- Pipeline checkpoints: a function timeout resumes instead of re-crawling.
-create table audit_stages (
+create table if not exists audit_stages (
   id          uuid primary key default gen_random_uuid(),
   audit_id    uuid not null references audits(id) on delete cascade,
   stage       text not null,
@@ -102,7 +137,7 @@ create table audit_stages (
   unique (audit_id, stage)
 );
 
-create table audit_pages (
+create table if not exists audit_pages (
   id          uuid primary key default gen_random_uuid(),
   audit_id    uuid not null references audits(id) on delete cascade,
   url         text not null,
@@ -115,10 +150,10 @@ create table audit_pages (
   signals     jsonb
 );
 
-create index audit_pages_audit_idx on audit_pages (audit_id);
+create index if not exists audit_pages_audit_idx on audit_pages (audit_id);
 
 -- One findings table across all four pillars — see docs/05 §1.
-create table findings (
+create table if not exists findings (
   id            uuid primary key default gen_random_uuid(),
   audit_id      uuid not null references audits(id) on delete cascade,
   check_id      text not null,
@@ -134,10 +169,10 @@ create table findings (
   affected_urls text[] not null default '{}'
 );
 
-create index findings_audit_idx    on findings (audit_id, pillar, status);
-create index findings_check_idx    on findings (check_id, status);
+create index if not exists findings_audit_idx    on findings (audit_id, pillar, status);
+create index if not exists findings_check_idx    on findings (check_id, status);
 
-create table recommendations (
+create table if not exists recommendations (
   id             uuid primary key default gen_random_uuid(),
   audit_id       uuid not null references audits(id) on delete cascade,
   check_id       text not null,
@@ -153,9 +188,9 @@ create table recommendations (
   sort_order     integer not null default 0
 );
 
-create index recommendations_audit_idx on recommendations (audit_id, horizon, sort_order);
+create index if not exists recommendations_audit_idx on recommendations (audit_id, horizon, sort_order);
 
-create table competitors (
+create table if not exists competitors (
   id                  uuid primary key default gen_random_uuid(),
   audit_id            uuid not null references audits(id) on delete cascade,
   host                text not null,
@@ -171,12 +206,12 @@ create table competitors (
   error               text
 );
 
-create index competitors_audit_idx on competitors (audit_id);
+create index if not exists competitors_audit_idx on competitors (audit_id);
 
 -- --- AI measurement audit trail --------------------------------------------
 -- Stores the full prompt, engine, sample index and raw answer so any
 -- share-of-voice figure can be reproduced or challenged.
-create table ai_queries (
+create table if not exists ai_queries (
   id            uuid primary key default gen_random_uuid(),
   audit_id      uuid not null references audits(id) on delete cascade,
   prompt        text not null,
@@ -188,9 +223,9 @@ create table ai_queries (
   created_at    timestamptz not null default now()
 );
 
-create index ai_queries_audit_idx on ai_queries (audit_id, engine);
+create index if not exists ai_queries_audit_idx on ai_queries (audit_id, engine);
 
-create table ai_mentions (
+create table if not exists ai_mentions (
   id           uuid primary key default gen_random_uuid(),
   ai_query_id  uuid not null references ai_queries(id) on delete cascade,
   audit_id     uuid not null references audits(id) on delete cascade,
@@ -201,9 +236,9 @@ create table ai_mentions (
   sentiment    text
 );
 
-create index ai_mentions_audit_idx on ai_mentions (audit_id, is_target);
+create index if not exists ai_mentions_audit_idx on ai_mentions (audit_id, is_target);
 
-create table question_gaps (
+create table if not exists question_gaps (
   id          uuid primary key default gen_random_uuid(),
   audit_id    uuid not null references audits(id) on delete cascade,
   question    text not null,
@@ -213,10 +248,10 @@ create table question_gaps (
   value       numeric(3,2) not null default 0.5
 );
 
-create index question_gaps_audit_idx on question_gaps (audit_id, answered);
+create index if not exists question_gaps_audit_idx on question_gaps (audit_id, answered);
 
 -- --- leads and pipeline ----------------------------------------------------
-create table leads (
+create table if not exists leads (
   id                   uuid primary key default gen_random_uuid(),
   audit_id             uuid references audits(id) on delete set null,
   brand_id             uuid references brands(id) on delete set null,
@@ -238,10 +273,10 @@ create table leads (
   updated_at           timestamptz not null default now()
 );
 
-create index leads_grade_status_idx on leads (grade, status, created_at desc);
-create index leads_email_idx        on leads (email);
+create index if not exists leads_grade_status_idx on leads (grade, status, created_at desc);
+create index if not exists leads_email_idx        on leads (email);
 
-create table appointments (
+create table if not exists appointments (
   id           uuid primary key default gen_random_uuid(),
   lead_id      uuid not null references leads(id) on delete cascade,
   provider     text not null default 'cal.com',
@@ -251,7 +286,7 @@ create table appointments (
   created_at   timestamptz not null default now()
 );
 
-create table reports (
+create table if not exists reports (
   id            uuid primary key default gen_random_uuid(),
   audit_id      uuid not null references audits(id) on delete cascade,
   format        text not null default 'pdf',
@@ -264,7 +299,7 @@ create table reports (
 -- --- response cache --------------------------------------------------------
 -- Postgres rather than Redis at V1 volumes: one datastore, and cache hits stay
 -- auditable when reconciling an API bill.
-create table api_cache (
+create table if not exists api_cache (
   cache_key  text primary key,
   provider   text not null,
   payload    jsonb not null,
@@ -272,9 +307,9 @@ create table api_cache (
   expires_at timestamptz not null
 );
 
-create index api_cache_expiry_idx on api_cache (expires_at);
+create index if not exists api_cache_expiry_idx on api_cache (expires_at);
 
-create table rate_limits (
+create table if not exists rate_limits (
   id         uuid primary key default gen_random_uuid(),
   scope      text not null,
   key        text not null,
@@ -306,7 +341,7 @@ alter table api_cache        enable row level security;
 alter table rate_limits      enable row level security;
 
 -- --- convenience view for the admin lead table -----------------------------
-create view lead_dashboard as
+create or replace view lead_dashboard as
 select
   l.id, l.created_at, l.name, l.company, l.designation, l.email, l.phone,
   l.budget_band, l.lead_score, l.grade, l.status,

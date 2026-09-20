@@ -58,17 +58,51 @@ It is also a real cost difference at low volume. Supabase's answer to "don't pau
 Neon has had no monthly minimum since December 2025, so a quiet month genuinely costs a few
 dollars.
 
-### Set up Neon
+### Set up Neon — the short way
+
+You do not need a Neon account. Create the database **from inside Vercel**, which sets
+`DATABASE_URL` for you:
+
+1. In your Vercel project → **Storage** → **Create Database** → **Neon** (Serverless Postgres)
+   → pick a region → **Create**.
+2. Vercel provisions it and injects `DATABASE_URL` (and Neon's other variables) into the project
+   automatically. Nothing to copy, and the pooled string is what it sets.
+3. Apply the schema with one command from your machine:
+
+   ```bash
+   npm run db:migrate -- "postgresql://…"      # the string from Vercel → Storage → your database
+   ```
+
+   Or pull the variables Vercel already set and skip the copy-paste entirely:
+
+   ```bash
+   npx vercel env pull .env.local
+   npm run db:migrate
+   ```
+
+That is the whole step. The migration is idempotent, so running it again is a no-op — useful
+when you are not certain the last attempt finished.
+
+### Set up Neon — the direct way
+
+If you would rather own the Neon account:
 
 1. Create a project at [neon.com](https://neon.com). Pick the region closest to your customers.
-2. **SQL Editor** → paste all of
-   [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) → **Run**.
-3. **Connection Details** → copy the **pooled** connection string. It has `-pooler` in the
-   hostname and ends in `?sslmode=require`. Use that one, not the direct string:
+2. **Connection Details** → copy the **pooled** connection string. It has `-pooler` in the
+   hostname and ends in `?sslmode=require`:
 
    ```
    DATABASE_URL=postgresql://USER:PASSWORD@ep-xxx-pooler.REGION.aws.neon.tech/neondb?sslmode=require
    ```
+3. Apply the schema:
+
+   ```bash
+   npm run db:migrate -- "postgresql://…"
+   ```
+
+   No SQL editor, no copy-paste. If you prefer the editor, pasting
+   [`supabase/migrations/0001_init.sql`](../supabase/migrations/0001_init.sql) into Neon's
+   **SQL Editor** and pressing Run does exactly the same thing.
 
 > **Always use the pooled connection string on Vercel.** Every serverless invocation is its own
 > process. Without pooling, a traffic spike opens hundreds of connections and the server starts
