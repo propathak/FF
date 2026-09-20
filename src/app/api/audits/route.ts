@@ -16,7 +16,43 @@ const RequestSchema = z.object({
   competitorUrls: z.array(z.string().max(2048)).max(3).default([]),
 });
 
+/**
+ * Every failure has to come back as JSON.
+ *
+ * An uncaught throw makes Next answer with an HTML error page, and the
+ * browser then fails to parse it -- which the form reported as "Network
+ * problem", sending people to check their wifi over a missing database
+ * table. The wrapper keeps the contract: a body with an `error` string,
+ * always.
+ */
 export async function POST(request: Request) {
+  try {
+    return await handlePost(request);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[api/audits] unhandled failure', err);
+
+    // The one failure an operator can act on themselves, and the most likely
+    // one on a fresh deployment: the database is connected but empty.
+    if (/relation .* does not exist|no schema has been selected/i.test(message)) {
+      return NextResponse.json(
+        {
+          error:
+            'The database is connected but has no tables yet. Open /admin and run the one-click schema setup, then try again.',
+          code: 'schema_missing',
+        },
+        { status: 503 },
+      );
+    }
+
+    return NextResponse.json(
+      { error: `Could not start the audit: ${message}`, code: 'server_error' },
+      { status: 500 },
+    );
+  }
+}
+
+async function handlePost(request: Request) {
   // Identity comes from the session, never from the request body — a
   // self-reported email would make the audit log worthless.
   const session = await auth();

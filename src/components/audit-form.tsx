@@ -56,20 +56,40 @@ export function AuditForm({
           competitorUrls: competitors.map((c) => c.trim()).filter(Boolean),
         }),
       });
-      const data = (await response.json()) as { id?: string; error?: string; code?: string };
+      // Parsed defensively. A server-side throw comes back as an HTML error
+      // page, and calling response.json() on it throws -- which used to land
+      // in the catch below and be reported as "Network problem", sending
+      // people to check their connection over a server fault they could
+      // actually have fixed.
+      let data: { id?: string; error?: string; code?: string } = {};
+      try {
+        data = (await response.json()) as typeof data;
+      } catch {
+        setError(
+          `The server returned an unexpected response (HTTP ${response.status}). Please try again, or check the deployment logs if this repeats.`,
+        );
+        setSubmitting(false);
+        return;
+      }
+
       if (response.status === 401 || data.code === 'unauthenticated') {
         // The session expired between page load and submit.
         router.push(`/signin?callbackUrl=${encodeURIComponent(`/?url=${url.trim()}`)}`);
         return;
       }
       if (!response.ok || !data.id) {
-        setError(data.error ?? 'We could not start that audit. Please try again.');
+        setError(data.error ?? `We could not start that audit (HTTP ${response.status}).`);
         setSubmitting(false);
         return;
       }
       router.push(`/audit/${data.id}`);
-    } catch {
-      setError('Network problem — please try again.');
+    } catch (err) {
+      // Only a genuine transport failure reaches here now.
+      setError(
+        err instanceof TypeError
+          ? 'Could not reach the server — check your connection and try again.'
+          : 'Something went wrong starting the audit. Please try again.',
+      );
       setSubmitting(false);
     }
   }
