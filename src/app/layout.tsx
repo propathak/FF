@@ -1,7 +1,9 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 
-const AGENCY = process.env['NEXT_PUBLIC_AGENCY_NAME'] ?? 'Index Joy';
+// The agency's own name, not the product's — this is the discreet white-label
+// slot in the report footer. Set NEXT_PUBLIC_AGENCY_NAME before launch.
+const AGENCY = process.env['NEXT_PUBLIC_AGENCY_NAME'] ?? 'Your Agency';
 const APP_URL = process.env['NEXT_PUBLIC_APP_URL'] ?? 'http://localhost:3000';
 
 export const metadata: Metadata = {
