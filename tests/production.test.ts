@@ -146,3 +146,20 @@ describe('schema setup permission', () => {
     expect(maySetUpSchema('', false)).toBe(false);
   });
 });
+
+describe('in-memory rate limiting', () => {
+  it('refuses a limit of zero instead of admitting the first caller', async () => {
+    // The fresh-window branch returned true before looking at the limit, so a
+    // zero limit still let one request through per window.
+    vi.stubEnv('DATABASE_URL', '');
+    vi.stubEnv('SUPABASE_URL', '');
+    vi.resetModules();
+    const { getRepository, __resetMemoryStore } = await import('@/lib/repository');
+    __resetMemoryStore();
+    const repo = getRepository();
+    expect(repo.driver).toBe('memory');
+    expect(await repo.consumeRateLimit('t', 'k', 0, 60_000)).toBe(false);
+    expect(await repo.consumeRateLimit('t', 'k', 2, 60_000)).toBe(true);
+    vi.unstubAllEnvs();
+  });
+});

@@ -2,6 +2,7 @@ import { NextResponse, after } from 'next/server';
 import { auth } from '@/auth';
 import { z } from 'zod';
 import { normaliseInputUrl } from '@/engine/util/url';
+import { envNumber } from '@/engine/util/env';
 import { getRepository, isEphemeralInProduction } from '@/lib/repository';
 import { createAuditRecord, executeAudit, hashIp, newAuditId } from '@/lib/audit-runner';
 
@@ -106,7 +107,10 @@ async function handlePost(request: Request) {
 
   // Two limits: per-domain stops audit-farming a competitor, per-IP stops a
   // single client burning the API budget. Both are cost controls first.
-  const perDomain = Number(process.env['AUDITS_PER_DOMAIN_PER_DAY'] ?? 3);
+  // envNumber, not Number(... ?? 3): a key that exists but is blank -- which
+  // is what importing a .env.example into Vercel produces -- parsed to 0 and
+  // refused every audit with "already been audited 0 times today".
+  const perDomain = envNumber(process.env, 'AUDITS_PER_DOMAIN_PER_DAY', 3);
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   const ipKey = await hashIp(ip);
 

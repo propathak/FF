@@ -39,7 +39,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   }
 
   const pdf = await renderReportPdf(audit.result, {
-    agencyName: process.env['NEXT_PUBLIC_AGENCY_NAME'] ?? 'Index Joy',
+    agencyName: process.env['NEXT_PUBLIC_AGENCY_NAME']?.trim() || 'Index Joy',
     appUrl: appUrl(),
   });
 

@@ -178,6 +178,9 @@ function memoryRepository(): Repository {
       const store = memoryStore();
       const bucketKey = `${scope}:${key}`;
       const now = Date.now();
+      // Checked before the fresh-window branch, which used to admit the first
+      // request whatever the limit was.
+      if (limit < 1) return false;
       const bucket = store.rateBuckets.get(bucketKey);
       if (!bucket || bucket.resetAt <= now) {
         store.rateBuckets.set(bucketKey, { count: 1, resetAt: now + windowMs });
@@ -473,18 +476,28 @@ function postgresRepository(connectionString: string): Repository {
     },
 
     async consumeRateLimit(scope, key, limit, windowMs) {
+      if (limit < 1) return false;
       const windowStart = new Date(Math.floor(Date.now() / windowMs) * windowMs);
       // Atomic: the insert-or-increment happens in one statement, so two
       // concurrent requests cannot both read the same count and both pass.
+      //
+      // The `where` matters. Without it a refused request still incremented,
+      // so a caller who hit the limit could never get back under it within
+      // the window -- every retry pushed the count further up. It also meant
+      // requests rejected for unrelated reasons burned real quota. Now the
+      // update is skipped once the limit is reached, no row comes back, and
+      // that absence is the refusal.
       const rows = await q<{ count: number }>(
         `insert into rate_limits (scope, key, window_start, count)
          values ($1,$2,$3,1)
          on conflict (scope, key, window_start)
            do update set count = rate_limits.count + 1
+           where rate_limits.count < $4
          returning count`,
-        [scope, key, windowStart],
+        [scope, key, windowStart, limit],
       );
-      return (rows[0]?.count ?? limit + 1) <= limit;
+      const count = rows[0]?.count;
+      return count !== undefined && count <= limit;
     },
   };
 }

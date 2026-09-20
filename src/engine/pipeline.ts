@@ -4,6 +4,7 @@ import type {
 } from './types';
 import { CRAWL_DEFAULTS, SCORING_VERSION } from './config';
 import { defaultFetcher, type Fetcher } from './util/http';
+import { envNumber, envString } from './util/env';
 import { normaliseInputUrl } from './util/url';
 import { plural } from './util/text';
 import { runDiscovery } from './crawl/discovery';
@@ -91,9 +92,9 @@ async function enrich(
 
   // Free signals always run, and run concurrently.
   const [performance, entity, authorityMap] = await Promise.all([
-    fetchPerformance(ctxBase.discovery.resolvedUrl, env['PAGESPEED_API_KEY']),
+    fetchPerformance(ctxBase.discovery.resolvedUrl, envString(env, 'PAGESPEED_API_KEY')),
     lookupEntity(ctxBase.brand.name, ctxBase.target.host),
-    fetchAuthority([ctxBase.target.host, ...competitorHosts], env['OPEN_PAGERANK_API_KEY']),
+    fetchAuthority([ctxBase.target.host, ...competitorHosts], envString(env, 'OPEN_PAGERANK_API_KEY')),
   ]);
 
   const authority = authorityMap[ctxBase.target.host.replace(/^www\./, '')] ?? {
@@ -225,9 +226,10 @@ export async function runAudit(input: AuditInput, deps: AuditDeps = {}): Promise
   const normalised = normaliseInputUrl(input.url, { allowLocal });
   if (!normalised) throw new Error(`"${input.url}" is not a valid website address.`);
   const market = input.market ?? 'global';
-  const maxPages = input.maxPages ?? Number(env['AUDIT_MAX_PAGES'] ?? CRAWL_DEFAULTS.maxPages);
+  const maxPages = input.maxPages ?? envNumber(env, 'AUDIT_MAX_PAGES', CRAWL_DEFAULTS.maxPages);
   const maxCompetitorPages =
-    input.maxCompetitorPages ?? Number(env['AUDIT_MAX_COMPETITOR_PAGES'] ?? CRAWL_DEFAULTS.maxCompetitorPages);
+    input.maxCompetitorPages ??
+    envNumber(env, 'AUDIT_MAX_COMPETITOR_PAGES', CRAWL_DEFAULTS.maxCompetitorPages);
 
   // --- Stage 1: discovery --------------------------------------------------
   emit(stageEvent('discovery', 'running', STAGE_LABELS.discovery));

@@ -147,4 +147,30 @@ maybe('postgres repository driver', () => {
     expect(results.filter(Boolean)).toHaveLength(3);
     expect(results.filter((r) => !r)).toHaveLength(2);
   });
+
+  it('does not charge quota for a call it refuses', async () => {
+    const key = `test-refuse-${Date.now()}`;
+    for (let i = 0; i < 6; i++) await repo.consumeRateLimit('audit:test', key, 2, 60_000);
+
+    const stored = execFileSync(
+      'psql',
+      [URL as string, '-tAc', `select count from rate_limits where scope = 'audit:test' and key = '${key}'`],
+      { encoding: 'utf8' },
+    ).trim();
+
+    // Six attempts, a limit of two: the counter must sit at two, not six.
+    // It used to increment on every call including the refusals, so anyone
+    // who hit a limit and retried pushed themselves further past it, and a
+    // request rejected for an unrelated reason still burned real quota.
+    expect(stored).toBe('2');
+  });
+
+  it('refuses everything when the limit is zero', async () => {
+    // A limit of zero is what a blank AUDITS_PER_DOMAIN_PER_DAY parsed to.
+    // Whatever produced it, zero must mean zero rather than letting the
+    // first caller of each window through.
+    const key = `test-zero-${Date.now()}`;
+    expect(await repo.consumeRateLimit('audit:test', key, 0, 60_000)).toBe(false);
+    expect(await repo.consumeRateLimit('audit:test', key, 0, 60_000)).toBe(false);
+  });
 });

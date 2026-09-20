@@ -15,5 +15,5 @@ export default async function AuditPage({ params }: { params: Promise<{ id: stri
   if (!session?.user?.email) {
     redirect(`/signin?callbackUrl=${encodeURIComponent(`/audit/${id}`)}`);
   }
-  return <ReportView auditId={id} bookingUrl={process.env['NEXT_PUBLIC_BOOKING_URL'] ?? null} />;
+  return <ReportView auditId={id} bookingUrl={process.env['NEXT_PUBLIC_BOOKING_URL']?.trim() || null} />;
 }
